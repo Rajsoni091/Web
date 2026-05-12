@@ -1,16 +1,2678 @@
 <!DOCTYPE html>
-<html>
+<html lang="en" data-theme="dark">
 <head>
-    <title>My First Website</title>
-    <link rel="stylesheet" href="style.css">
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Myntra × Salesforce — Async Processing Playbook</title>
+
+<!-- Fonts -->
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+
+<!-- Tailwind -->
+<script src="https://cdn.tailwindcss.com"></script>
+
+<!-- Prism.js for syntax highlighting -->
+<link href="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/themes/prism-tomorrow.min.css" rel="stylesheet" />
+<script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/prism.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/components/prism-java.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/components/prism-apex.min.js"></script>
+
+<!-- Lucide icons -->
+<script src="https://unpkg.com/lucide@latest/dist/umd/lucide.min.js"></script>
+
+<style>
+  :root {
+    --myntra-pink: #ff3f6c;
+    --myntra-coral: #ff905a;
+    --sf-blue: #0176d3;
+    --sf-deep: #032d60;
+    --sf-sky: #1ab9ff;
+  }
+
+  [data-theme="dark"] {
+    --bg-0: #07090f;
+    --bg-1: #0b0f1a;
+    --bg-2: #121827;
+    --bg-3: #1a2238;
+    --card: rgba(18, 24, 39, 0.6);
+    --card-border: rgba(255, 255, 255, 0.08);
+    --text: #e7ecf3;
+    --text-dim: #9aa4b8;
+    --text-mute: #6b7590;
+    --glow: rgba(255, 63, 108, 0.35);
+    --grid: rgba(255, 255, 255, 0.04);
+  }
+  [data-theme="light"] {
+    --bg-0: #f7f8fc;
+    --bg-1: #ffffff;
+    --bg-2: #f0f2f8;
+    --bg-3: #e6eaf2;
+    --card: rgba(255, 255, 255, 0.85);
+    --card-border: rgba(3, 45, 96, 0.12);
+    --text: #0b1220;
+    --text-dim: #3a4560;
+    --text-mute: #6b7590;
+    --glow: rgba(255, 63, 108, 0.22);
+    --grid: rgba(3, 45, 96, 0.05);
+  }
+
+  * { box-sizing: border-box; }
+  html { scroll-behavior: smooth; }
+  body {
+    font-family: 'Inter', system-ui, sans-serif;
+    background: var(--bg-0);
+    color: var(--text);
+    margin: 0;
+    overflow-x: hidden;
+    transition: background 0.4s ease, color 0.4s ease;
+  }
+  code, pre { font-family: 'JetBrains Mono', ui-monospace, monospace; }
+
+  /* Animated background */
+  .bg-grid {
+    position: fixed; inset: 0; z-index: -2;
+    background-image:
+      linear-gradient(var(--grid) 1px, transparent 1px),
+      linear-gradient(90deg, var(--grid) 1px, transparent 1px);
+    background-size: 56px 56px;
+    mask-image: radial-gradient(ellipse at top, rgba(0,0,0,0.9), transparent 70%);
+  }
+  .bg-blobs {
+    position: fixed; inset: 0; z-index: -1; overflow: hidden; pointer-events: none;
+  }
+  .blob {
+    position: absolute; border-radius: 50%; filter: blur(90px); opacity: 0.5;
+    animation: float 18s ease-in-out infinite;
+  }
+  .blob-1 { width: 520px; height: 520px; background: var(--myntra-pink); top: -120px; left: -120px; }
+  .blob-2 { width: 460px; height: 460px; background: var(--sf-blue); top: 20%; right: -120px; animation-delay: -6s; }
+  .blob-3 { width: 380px; height: 380px; background: var(--myntra-coral); bottom: -120px; left: 30%; animation-delay: -12s; }
+  [data-theme="light"] .blob { opacity: 0.22; }
+
+  @keyframes float {
+    0%, 100% { transform: translate(0,0) scale(1); }
+    33% { transform: translate(60px, -40px) scale(1.08); }
+    66% { transform: translate(-40px, 50px) scale(0.95); }
+  }
+
+  /* Glass card */
+  .glass {
+    background: var(--card);
+    backdrop-filter: blur(18px) saturate(140%);
+    -webkit-backdrop-filter: blur(18px) saturate(140%);
+    border: 1px solid var(--card-border);
+    border-radius: 18px;
+  }
+  .glass-strong {
+    background: linear-gradient(145deg, var(--card), rgba(255,255,255,0.02));
+    backdrop-filter: blur(22px) saturate(160%);
+    border: 1px solid var(--card-border);
+    border-radius: 20px;
+  }
+
+  /* Gradient text */
+  .grad-text {
+    background: linear-gradient(95deg, var(--myntra-pink), var(--myntra-coral) 40%, var(--sf-sky) 80%);
+    -webkit-background-clip: text; background-clip: text; -webkit-text-fill-color: transparent;
+  }
+  .grad-text-sf {
+    background: linear-gradient(95deg, var(--sf-sky), var(--sf-blue));
+    -webkit-background-clip: text; background-clip: text; -webkit-text-fill-color: transparent;
+  }
+
+  /* Buttons */
+  .btn-primary {
+    background: linear-gradient(95deg, var(--myntra-pink), var(--myntra-coral));
+    color: #fff; border-radius: 12px; padding: 12px 22px; font-weight: 600;
+    transition: transform 0.2s, box-shadow 0.3s; position: relative; overflow: hidden;
+    box-shadow: 0 8px 24px -8px var(--glow);
+  }
+  .btn-primary:hover { transform: translateY(-2px); box-shadow: 0 14px 32px -8px var(--glow); }
+  .btn-primary:active { transform: translateY(0); }
+  .btn-primary::after {
+    content:''; position: absolute; inset: 0; background: linear-gradient(120deg, transparent, rgba(255,255,255,0.3), transparent);
+    transform: translateX(-100%); transition: transform 0.6s;
+  }
+  .btn-primary:hover::after { transform: translateX(100%); }
+
+  .btn-ghost {
+    background: transparent; color: var(--text); border: 1px solid var(--card-border);
+    border-radius: 12px; padding: 10px 18px; font-weight: 500; transition: all 0.25s;
+  }
+  .btn-ghost:hover { background: var(--bg-2); border-color: var(--myntra-pink); }
+
+  /* Navbar */
+  .navbar {
+    position: fixed; top: 0; left: 0; right: 0; z-index: 50;
+    backdrop-filter: blur(16px) saturate(180%);
+    background: color-mix(in srgb, var(--bg-0) 75%, transparent);
+    border-bottom: 1px solid var(--card-border);
+  }
+
+  /* Side nav */
+  .sidenav a {
+    display: flex; align-items: center; gap: 10px; padding: 10px 14px; border-radius: 10px;
+    color: var(--text-dim); font-size: 14px; font-weight: 500; transition: all 0.2s;
+    border-left: 2px solid transparent;
+  }
+  .sidenav a:hover { background: var(--bg-2); color: var(--text); }
+  .sidenav a.active {
+    color: var(--text); background: linear-gradient(90deg, color-mix(in srgb, var(--myntra-pink) 15%, transparent), transparent);
+    border-left-color: var(--myntra-pink);
+  }
+
+  /* Section fade-in */
+  .reveal { opacity: 0; transform: translateY(24px); transition: opacity 0.7s ease, transform 0.7s ease; }
+  .reveal.in { opacity: 1; transform: translateY(0); }
+
+  /* Numbered step badge */
+  .step-num {
+    width: 44px; height: 44px; border-radius: 12px; display: inline-flex; align-items: center; justify-content: center;
+    font-weight: 700; font-size: 18px; color: #fff;
+    background: linear-gradient(135deg, var(--myntra-pink), var(--sf-blue));
+    box-shadow: 0 6px 18px -6px var(--glow);
+  }
+
+  /* Pipeline steps for simulator */
+  .pipe-step {
+    display: flex; align-items: center; gap: 14px; padding: 14px 16px; border-radius: 14px;
+    background: var(--bg-2); border: 1px solid var(--card-border);
+    opacity: 0.45; transition: all 0.5s ease;
+    position: relative;
+  }
+  .pipe-step.active {
+    opacity: 1; border-color: var(--myntra-pink);
+    box-shadow: 0 0 0 3px color-mix(in srgb, var(--myntra-pink) 20%, transparent), 0 10px 30px -10px var(--glow);
+    transform: translateX(4px);
+  }
+  .pipe-step.done { opacity: 0.9; border-color: #22c55e; }
+  .pipe-step.done .pipe-icon { background: rgba(34,197,94,0.15); color: #22c55e; }
+  .pipe-icon {
+    width: 40px; height: 40px; border-radius: 10px; display: flex; align-items: center; justify-content: center;
+    background: color-mix(in srgb, var(--sf-blue) 15%, transparent); color: var(--sf-sky); flex-shrink: 0;
+  }
+  .pipe-step.active .pipe-icon { animation: pulse 1.2s ease-in-out infinite; }
+  @keyframes pulse {
+    0%, 100% { box-shadow: 0 0 0 0 color-mix(in srgb, var(--myntra-pink) 50%, transparent); }
+    50% { box-shadow: 0 0 0 10px transparent; }
+  }
+
+  /* Callout */
+  .callout {
+    background: linear-gradient(95deg, color-mix(in srgb, var(--sf-blue) 12%, transparent), color-mix(in srgb, var(--myntra-pink) 8%, transparent));
+    border-left: 3px solid var(--sf-sky); padding: 14px 18px; border-radius: 12px;
+  }
+  .callout-warn {
+    background: linear-gradient(95deg, rgba(250,204,21,0.1), transparent);
+    border-left: 3px solid #facc15; padding: 14px 18px; border-radius: 12px;
+  }
+
+  /* Code block */
+  pre[class*="language-"] {
+    border-radius: 12px !important; border: 1px solid var(--card-border); margin: 0 !important;
+    font-size: 13px !important; max-height: 420px;
+  }
+
+  /* Toggle switch */
+  .theme-toggle {
+    width: 56px; height: 30px; background: var(--bg-2); border-radius: 30px; position: relative; cursor: pointer;
+    border: 1px solid var(--card-border); transition: background 0.3s;
+  }
+  .theme-toggle::after {
+    content: ''; position: absolute; top: 3px; left: 3px; width: 22px; height: 22px; border-radius: 50%;
+    background: linear-gradient(135deg, var(--myntra-pink), var(--myntra-coral));
+    transition: transform 0.3s cubic-bezier(0.68, -0.55, 0.27, 1.55);
+  }
+  [data-theme="light"] .theme-toggle::after {
+    transform: translateX(26px); background: linear-gradient(135deg, var(--sf-blue), var(--sf-sky));
+  }
+
+  /* Matrix table */
+  .matrix-row { transition: all 0.3s; cursor: pointer; }
+  .matrix-row:hover { background: var(--bg-2); }
+  .matrix-row.open { background: var(--bg-2); }
+  .matrix-panel {
+    max-height: 0; overflow: hidden; transition: max-height 0.5s ease;
+  }
+  .matrix-panel.open { max-height: 700px; }
+
+  /* Architecture SVG */
+  .arch-node {
+    fill: var(--bg-2); stroke: var(--card-border); stroke-width: 1.5;
+    transition: all 0.3s; cursor: pointer;
+  }
+  .arch-node:hover { fill: var(--bg-3); stroke: var(--myntra-pink); stroke-width: 2; }
+  .arch-node-text { fill: var(--text); font-family: 'Inter'; font-weight: 600; font-size: 13px; pointer-events: none; }
+  .arch-node-sub { fill: var(--text-dim); font-family: 'Inter'; font-size: 10px; pointer-events: none; }
+  .arch-path { fill: none; stroke: var(--text-mute); stroke-width: 2; stroke-dasharray: 6 4; }
+  .arch-path-flow { animation: dashflow 1.2s linear infinite; }
+  @keyframes dashflow {
+    to { stroke-dashoffset: -20; }
+  }
+  .arch-dot { fill: var(--myntra-pink); }
+
+  /* Chain nodes */
+  .chain-node {
+    position: relative; padding: 20px; border-radius: 16px; background: var(--bg-2);
+    border: 1px solid var(--card-border); transition: all 0.4s;
+  }
+  .chain-node.running {
+    border-color: var(--sf-sky);
+    box-shadow: 0 0 0 3px color-mix(in srgb, var(--sf-sky) 25%, transparent);
+  }
+  .chain-node.done {
+    border-color: #22c55e;
+    box-shadow: 0 0 0 3px color-mix(in srgb, #22c55e 20%, transparent);
+  }
+  .chain-arrow { color: var(--text-mute); }
+  .chain-arrow.active { color: var(--sf-sky); animation: slideRight 0.8s ease infinite; }
+  @keyframes slideRight {
+    0%, 100% { transform: translateX(0); } 50% { transform: translateX(6px); }
+  }
+
+  /* Progress bar */
+  .progress-track {
+    width: 100%; height: 10px; background: var(--bg-2); border-radius: 20px; overflow: hidden;
+    border: 1px solid var(--card-border);
+  }
+  .progress-fill {
+    height: 100%; background: linear-gradient(90deg, var(--myntra-pink), var(--myntra-coral), var(--sf-sky));
+    width: 0%; border-radius: 20px; transition: width 0.2s ease;
+    box-shadow: 0 0 20px var(--glow);
+  }
+
+  /* Cart item fade */
+  .cart-item {
+    padding: 10px 14px; border-radius: 10px; background: var(--bg-2); border: 1px solid var(--card-border);
+    display: flex; justify-content: space-between; align-items: center;
+    transition: all 0.6s ease;
+  }
+  .cart-item.deleted {
+    opacity: 0; transform: translateX(100%) scale(0.95);
+  }
+
+  /* Quiz */
+  .quiz-opt {
+    padding: 14px 16px; border-radius: 12px; background: var(--bg-2); border: 1px solid var(--card-border);
+    cursor: pointer; transition: all 0.25s; text-align: left; width: 100%;
+  }
+  .quiz-opt:hover { border-color: var(--myntra-pink); transform: translateX(4px); }
+  .quiz-opt.correct { background: color-mix(in srgb, #22c55e 20%, transparent); border-color: #22c55e; }
+  .quiz-opt.wrong { background: color-mix(in srgb, #ef4444 20%, transparent); border-color: #ef4444; }
+  .quiz-opt:disabled { cursor: not-allowed; }
+
+  /* Tooltip */
+  .tooltip {
+    position: absolute; background: var(--bg-3); color: var(--text);
+    padding: 8px 12px; border-radius: 8px; font-size: 12px; font-weight: 500;
+    border: 1px solid var(--card-border); pointer-events: none;
+    opacity: 0; transform: translateY(4px); transition: all 0.2s;
+    z-index: 100; white-space: nowrap;
+    box-shadow: 0 8px 20px rgba(0,0,0,0.3);
+  }
+  .tooltip.show { opacity: 1; transform: translateY(0); }
+
+  /* Clock face */
+  .clock-face {
+    width: 180px; height: 180px; border-radius: 50%;
+    background: radial-gradient(circle at 50% 40%, var(--bg-3), var(--bg-1));
+    border: 2px solid var(--card-border); position: relative; margin: 0 auto;
+    box-shadow: inset 0 0 40px rgba(0,0,0,0.4), 0 10px 30px -10px var(--glow);
+    transition: background 0.6s ease, box-shadow 0.6s ease, border-color 0.6s ease;
+  }
+  .clock-face.night {
+    background: radial-gradient(circle at 50% 40%, #1a2250, #070a1a);
+    border-color: color-mix(in srgb, var(--sf-sky) 45%, transparent);
+    box-shadow:
+      inset 0 0 50px rgba(0,0,0,0.7),
+      0 10px 40px -10px rgba(26,185,255,0.4),
+      0 0 0 3px color-mix(in srgb, var(--sf-sky) 15%, transparent);
+  }
+  .clock-face.night::before {
+    content: '';
+    position: absolute; inset: 0; border-radius: 50%;
+    background: radial-gradient(circle at 70% 25%, rgba(255,255,255,0.9) 0 1.5px, transparent 2px) 0 0/100% 100%,
+                radial-gradient(circle at 25% 65%, rgba(255,255,255,0.7) 0 1px, transparent 1.5px) 0 0/100% 100%,
+                radial-gradient(circle at 60% 75%, rgba(255,255,255,0.6) 0 1px, transparent 1.5px) 0 0/100% 100%,
+                radial-gradient(circle at 35% 25%, rgba(255,255,255,0.5) 0 1px, transparent 1.5px) 0 0/100% 100%;
+    pointer-events: none;
+    animation: twinkle 2.5s ease-in-out infinite;
+  }
+  @keyframes twinkle {
+    0%, 100% { opacity: 0.9; }
+    50% { opacity: 0.4; }
+  }
+  .clock-hand {
+    position: absolute; left: 50%; bottom: 50%; transform-origin: 50% 100%;
+    border-radius: 4px;
+  }
+  .clock-hand.animating {
+    transition: transform 1.6s cubic-bezier(0.65, 0.02, 0.35, 1);
+  }
+  .hand-hour { width: 4px; height: 45px; background: var(--text); margin-left: -2px; }
+  .hand-min { width: 3px; height: 60px; background: var(--myntra-pink); margin-left: -1.5px; }
+  .hand-sec { width: 2px; height: 70px; background: var(--sf-sky); margin-left: -1px; }
+  .clock-center {
+    position: absolute; width: 12px; height: 12px; border-radius: 50%;
+    background: var(--myntra-pink); top: 50%; left: 50%; transform: translate(-50%, -50%);
+    box-shadow: 0 0 12px var(--glow);
+  }
+  .clock-mark {
+    position: absolute; width: 2px; height: 10px; background: var(--text-dim); left: 50%; top: 4px; margin-left: -1px;
+    transform-origin: 50% 86px;
+  }
+
+  /* Syntax highlight override */
+  pre[class*="language-"] { background: var(--bg-1) !important; }
+  [data-theme="light"] .token.comment { color: #6b7280 !important; }
+  [data-theme="light"] .token.string { color: #16a34a !important; }
+  [data-theme="light"] .token.keyword { color: #dc2626 !important; }
+  [data-theme="light"] .token.class-name { color: #2563eb !important; }
+  [data-theme="light"] pre[class*="language-"] { color: #1f2937 !important; }
+
+  /* Tab styling */
+  .code-tab {
+    padding: 10px 16px; border-radius: 10px; font-size: 13px; font-weight: 500;
+    color: var(--text-dim); cursor: pointer; transition: all 0.2s; border: 1px solid transparent;
+    white-space: nowrap;
+  }
+  .code-tab:hover { color: var(--text); background: var(--bg-2); }
+  .code-tab.active {
+    color: var(--text); background: var(--bg-2); border-color: var(--myntra-pink);
+    box-shadow: 0 0 0 1px color-mix(in srgb, var(--myntra-pink) 30%, transparent);
+  }
+
+  /* Code snippet popup */
+  .code-popup {
+    position: absolute; right: 14px; top: 50%; transform: translateY(-50%);
+    background: var(--bg-0); border: 1px solid var(--myntra-pink);
+    border-radius: 8px; padding: 8px 12px; font-family: 'JetBrains Mono';
+    font-size: 11px; color: var(--sf-sky); opacity: 0;
+    transition: opacity 0.4s;
+    pointer-events: none;
+  }
+  .pipe-step.active .code-popup { opacity: 1; }
+
+  /* Counter */
+  .counter-display {
+    font-family: 'JetBrains Mono'; font-size: 32px; font-weight: 700;
+    background: linear-gradient(135deg, var(--myntra-pink), var(--sf-sky));
+    -webkit-background-clip: text; background-clip: text; -webkit-text-fill-color: transparent;
+    font-variant-numeric: tabular-nums;
+  }
+
+  /* Scrollbar */
+  ::-webkit-scrollbar { width: 10px; height: 10px; }
+  ::-webkit-scrollbar-track { background: var(--bg-0); }
+  ::-webkit-scrollbar-thumb { background: var(--bg-3); border-radius: 10px; }
+  ::-webkit-scrollbar-thumb:hover { background: var(--myntra-pink); }
+
+  /* Mobile nav drawer */
+  .mobile-nav { display: none; }
+  @media (max-width: 1024px) {
+    .sidenav { display: none; }
+  }
+
+  /* Hero particle dots */
+  .particle {
+    position: absolute; width: 4px; height: 4px; border-radius: 50%;
+    background: var(--myntra-pink); opacity: 0.6;
+    animation: rise linear infinite;
+  }
+  @keyframes rise {
+    0% { transform: translateY(0) scale(1); opacity: 0; }
+    10% { opacity: 0.6; }
+    90% { opacity: 0.3; }
+    100% { transform: translateY(-100vh) scale(0.3); opacity: 0; }
+  }
+
+  /* Badge */
+  .badge {
+    display: inline-flex; align-items: center; gap: 6px; padding: 4px 10px;
+    border-radius: 999px; font-size: 11px; font-weight: 600; text-transform: uppercase;
+    letter-spacing: 0.5px;
+  }
+  .badge-sync { background: color-mix(in srgb, var(--sf-blue) 20%, transparent); color: var(--sf-sky); }
+  .badge-async { background: color-mix(in srgb, var(--myntra-pink) 20%, transparent); color: var(--myntra-pink); }
+
+  /* Utility */
+  .divider-gradient {
+    height: 1px; background: linear-gradient(90deg, transparent, var(--myntra-pink), var(--sf-sky), transparent);
+  }
+
+  section { scroll-margin-top: 90px; }
+
+  /* Copy button */
+  .copy-btn {
+    position: absolute; top: 10px; right: 10px; z-index: 2;
+    background: var(--bg-3); color: var(--text-dim); border: 1px solid var(--card-border);
+    padding: 6px 10px; border-radius: 8px; font-size: 11px; font-weight: 600;
+    cursor: pointer; transition: all 0.2s; display: flex; align-items: center; gap: 6px;
+  }
+  .copy-btn:hover { color: var(--text); border-color: var(--myntra-pink); }
+  .copy-btn.copied { color: #22c55e; border-color: #22c55e; }
+
+  .code-wrap { position: relative; }
+
+  /* ============================================================
+     NEW: PROFESSIONAL LOGO
+  ============================================================ */
+  .brand-logo {
+    position: relative;
+    width: 42px; height: 42px;
+    display: flex; align-items: center; justify-content: center;
+    border-radius: 12px;
+    background: linear-gradient(135deg, #0b0f1a 0%, #1a2238 100%);
+    border: 1px solid var(--card-border);
+    box-shadow:
+      0 8px 20px -8px rgba(255,63,108,0.35),
+      inset 0 1px 0 rgba(255,255,255,0.08);
+    overflow: hidden;
+    transition: transform 0.35s cubic-bezier(0.34, 1.56, 0.64, 1), box-shadow 0.35s;
+  }
+  [data-theme="light"] .brand-logo {
+    background: linear-gradient(135deg, #ffffff 0%, #eef2f9 100%);
+  }
+  .brand-logo::before {
+    content: '';
+    position: absolute; inset: -2px;
+    background: conic-gradient(from 0deg, transparent, var(--myntra-pink), var(--sf-sky), transparent 50%);
+    border-radius: 14px;
+    opacity: 0.55;
+    animation: logoSpin 6s linear infinite;
+    z-index: 0;
+  }
+  .brand-logo::after {
+    content: '';
+    position: absolute; inset: 2px;
+    border-radius: 10px;
+    background: linear-gradient(135deg, var(--bg-1), var(--bg-2));
+    z-index: 1;
+  }
+  [data-theme="light"] .brand-logo::after {
+    background: linear-gradient(135deg, #ffffff, #f4f6fb);
+  }
+  .brand-logo svg { position: relative; z-index: 2; }
+  .brand-logo:hover { transform: scale(1.06) rotate(-3deg); }
+  @keyframes logoSpin {
+    to { transform: rotate(360deg); }
+  }
+
+  .brand-wordmark {
+    font-weight: 800; font-size: 15px; letter-spacing: -0.02em;
+    background: linear-gradient(95deg, var(--text), var(--myntra-pink) 60%, var(--sf-sky));
+    -webkit-background-clip: text; background-clip: text; -webkit-text-fill-color: transparent;
+  }
+
+  /* ============================================================
+     NEW: MOUSE SPOTLIGHT (cursor-reactive ambient light)
+  ============================================================ */
+  .spotlight {
+    position: fixed; top: 0; left: 0; width: 100vw; height: 100vh;
+    pointer-events: none; z-index: -1;
+    background: radial-gradient(
+      600px circle at var(--mx, 50%) var(--my, 50%),
+      color-mix(in srgb, var(--myntra-pink) 10%, transparent),
+      transparent 40%
+    );
+    transition: background 0.15s;
+  }
+  [data-theme="light"] .spotlight {
+    background: radial-gradient(
+      600px circle at var(--mx, 50%) var(--my, 50%),
+      color-mix(in srgb, var(--myntra-pink) 6%, transparent),
+      transparent 40%
+    );
+  }
+
+  /* ============================================================
+     NEW: HERO ENHANCEMENTS
+  ============================================================ */
+  .hero-eyebrow {
+    display: inline-flex; align-items: center; gap: 10px;
+    padding: 6px 14px 6px 6px;
+    border-radius: 999px;
+    background: color-mix(in srgb, var(--bg-2) 70%, transparent);
+    border: 1px solid var(--card-border);
+    backdrop-filter: blur(10px);
+    font-size: 12px; font-weight: 600;
+    color: var(--text-dim);
+    margin-bottom: 16px;
+  }
+  .hero-eyebrow .dot {
+    width: 22px; height: 22px; border-radius: 50%;
+    display: inline-flex; align-items: center; justify-content: center;
+    background: linear-gradient(135deg, var(--myntra-pink), var(--sf-sky));
+    color: white;
+    font-size: 11px; font-weight: 800;
+  }
+  .hero-eyebrow .pulse {
+    width: 8px; height: 8px; border-radius: 50%;
+    background: #22c55e;
+    box-shadow: 0 0 0 0 #22c55e;
+    animation: livePulse 1.8s ease-out infinite;
+  }
+  @keyframes livePulse {
+    0% { box-shadow: 0 0 0 0 rgba(34,197,94,0.6); }
+    70% { box-shadow: 0 0 0 10px rgba(34,197,94,0); }
+    100% { box-shadow: 0 0 0 0 rgba(34,197,94,0); }
+  }
+
+  .hero-credit {
+    display: inline-flex; align-items: center; gap: 10px;
+    margin-top: 28px;
+    font-size: 14px; color: var(--text-dim);
+  }
+  .hero-credit .avatar {
+    width: 32px; height: 32px; border-radius: 50%;
+    background: linear-gradient(135deg, var(--myntra-pink), var(--myntra-coral), var(--sf-sky));
+    display: inline-flex; align-items: center; justify-content: center;
+    color: white; font-weight: 800; font-size: 13px;
+    box-shadow: 0 6px 18px -6px var(--glow);
+    border: 2px solid var(--bg-0);
+  }
+  .hero-credit strong {
+    color: var(--text);
+    font-weight: 700;
+    background: linear-gradient(95deg, var(--myntra-pink), var(--sf-sky));
+    -webkit-background-clip: text; background-clip: text; -webkit-text-fill-color: transparent;
+  }
+
+  /* Floating orbit decoration in hero */
+  .hero-orbit {
+    position: absolute; top: 40px; right: -60px;
+    width: 280px; height: 280px;
+    pointer-events: none;
+    opacity: 0.65;
+  }
+  @media (max-width: 1024px) { .hero-orbit { display: none; } }
+  .hero-orbit .ring {
+    position: absolute; inset: 0;
+    border-radius: 50%;
+    border: 1px dashed var(--card-border);
+    animation: orbitSpin 30s linear infinite;
+  }
+  .hero-orbit .ring.r2 { inset: 40px; animation-duration: 22s; animation-direction: reverse; border-color: color-mix(in srgb, var(--myntra-pink) 25%, transparent); }
+  .hero-orbit .ring.r3 { inset: 80px; animation-duration: 16s; border-color: color-mix(in srgb, var(--sf-sky) 25%, transparent); }
+  @keyframes orbitSpin { to { transform: rotate(360deg); } }
+  .hero-orbit .planet {
+    position: absolute; width: 46px; height: 46px; border-radius: 14px;
+    background: var(--bg-2);
+    border: 1px solid var(--card-border);
+    display: flex; align-items: center; justify-content: center;
+    box-shadow: 0 10px 30px -10px var(--glow);
+    backdrop-filter: blur(10px);
+  }
+  .hero-orbit .planet.p1 { top: -20px; left: 50%; transform: translateX(-50%); color: var(--myntra-pink); }
+  .hero-orbit .planet.p2 { bottom: 20px; left: -8px; color: var(--sf-sky); }
+  .hero-orbit .planet.p3 { bottom: 40px; right: 0; color: var(--myntra-coral); }
+  .hero-orbit .planet.p4 { top: 80px; right: -10px; color: #22c55e; }
+  .hero-orbit .core {
+    position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%);
+    width: 90px; height: 90px; border-radius: 50%;
+    background: radial-gradient(circle, var(--myntra-pink), var(--sf-blue));
+    filter: blur(8px); opacity: 0.6;
+    animation: coreBreathe 4s ease-in-out infinite;
+  }
+  @keyframes coreBreathe {
+    0%, 100% { transform: translate(-50%, -50%) scale(1); opacity: 0.6; }
+    50% { transform: translate(-50%, -50%) scale(1.15); opacity: 0.85; }
+  }
+
+  /* Tech marquee under hero */
+  .marquee {
+    overflow: hidden;
+    position: relative;
+    margin-top: 60px;
+    padding: 16px 0;
+    border-top: 1px solid var(--card-border);
+    border-bottom: 1px solid var(--card-border);
+    background: color-mix(in srgb, var(--bg-1) 60%, transparent);
+    backdrop-filter: blur(10px);
+    mask-image: linear-gradient(90deg, transparent, black 10%, black 90%, transparent);
+  }
+  .marquee-track {
+    display: flex; gap: 48px;
+    width: max-content;
+    animation: marqueeScroll 32s linear infinite;
+  }
+  .marquee-item {
+    display: inline-flex; align-items: center; gap: 10px;
+    font-size: 13px; font-weight: 600;
+    color: var(--text-dim);
+    white-space: nowrap;
+  }
+  .marquee-item i { color: var(--myntra-pink); }
+  .marquee-item:nth-child(2n) i { color: var(--sf-sky); }
+  .marquee-item:nth-child(3n) i { color: var(--myntra-coral); }
+  @keyframes marqueeScroll {
+    to { transform: translateX(-50%); }
+  }
+
+  /* Enhance hero title with animated gradient */
+  .grad-text, .grad-text-sf {
+    background-size: 200% auto;
+    animation: gradShift 6s ease-in-out infinite;
+  }
+  @keyframes gradShift {
+    0%, 100% { background-position: 0% center; }
+    50% { background-position: 100% center; }
+  }
+
+  /* Stat card hover lift */
+  .stat-card {
+    transition: transform 0.3s cubic-bezier(0.34, 1.56, 0.64, 1), border-color 0.3s, box-shadow 0.3s;
+    position: relative; overflow: hidden;
+  }
+  .stat-card::before {
+    content: ''; position: absolute; inset: 0;
+    background: radial-gradient(circle at var(--sx, 50%) var(--sy, 50%), color-mix(in srgb, var(--myntra-pink) 20%, transparent), transparent 60%);
+    opacity: 0; transition: opacity 0.3s;
+    pointer-events: none;
+  }
+  .stat-card:hover {
+    transform: translateY(-4px);
+    border-color: color-mix(in srgb, var(--myntra-pink) 40%, var(--card-border));
+    box-shadow: 0 16px 40px -16px var(--glow);
+  }
+  .stat-card:hover::before { opacity: 1; }
+
+  /* ============================================================
+     NEW: FLOATING "DEVELOPED BY AYUSH" BADGE
+  ============================================================ */
+  .dev-badge {
+    position: fixed;
+    bottom: 20px; right: 20px;
+    z-index: 60;
+    display: inline-flex; align-items: center; gap: 10px;
+    padding: 8px 14px 8px 8px;
+    border-radius: 999px;
+    background: color-mix(in srgb, var(--bg-1) 45%, transparent);
+    backdrop-filter: blur(10px) saturate(140%);
+    -webkit-backdrop-filter: blur(10px) saturate(140%);
+    border: 1px solid color-mix(in srgb, var(--card-border) 60%, transparent);
+    font-size: 12px; font-weight: 600;
+    color: var(--text-dim);
+    text-decoration: none;
+    box-shadow: 0 8px 24px -14px rgba(0,0,0,0.3);
+    transition: transform 0.3s cubic-bezier(0.34, 1.56, 0.64, 1),
+                border-color 0.3s, box-shadow 0.3s, color 0.3s,
+                background 0.3s, opacity 0.3s;
+    opacity: 0;
+    transform: translateY(20px);
+    animation: devBadgeIn 0.6s 1.2s cubic-bezier(0.34, 1.56, 0.64, 1) forwards;
+    cursor: pointer;
+  }
+  @keyframes devBadgeIn {
+    to { opacity: 0.55; transform: translateY(0); }
+  }
+  .dev-badge:hover {
+    opacity: 1;
+    transform: translateY(-3px) scale(1.03);
+    background: color-mix(in srgb, var(--bg-1) 85%, transparent);
+    border-color: color-mix(in srgb, var(--myntra-pink) 50%, transparent);
+    box-shadow: 0 16px 40px -12px var(--glow);
+    color: var(--text);
+  }
+  .dev-badge .dev-avatar {
+    width: 26px; height: 26px; border-radius: 50%;
+    background: linear-gradient(135deg, var(--myntra-pink), var(--myntra-coral), var(--sf-sky));
+    display: inline-flex; align-items: center; justify-content: center;
+    color: white; font-weight: 800; font-size: 11px;
+    box-shadow: 0 4px 10px -2px var(--glow);
+    opacity: 0.85;
+  }
+  .dev-badge:hover .dev-avatar { opacity: 1; }
+  .dev-badge strong {
+    color: var(--text);
+    font-weight: 700;
+  }
+  .dev-badge .heart {
+    display: inline-block;
+    color: var(--myntra-pink);
+    animation: heartBeat 1.6s ease-in-out infinite;
+  }
+  @keyframes heartBeat {
+    0%, 100% { transform: scale(1); }
+    15% { transform: scale(1.25); }
+    30% { transform: scale(1); }
+    45% { transform: scale(1.15); }
+    60% { transform: scale(1); }
+  }
+
+  @media (max-width: 640px) {
+    .dev-badge { bottom: 12px; right: 12px; padding: 6px 12px 6px 6px; font-size: 11px; }
+    .dev-badge .dev-avatar { width: 22px; height: 22px; font-size: 10px; }
+  }
+
+  /* Smooth entrance for navbar logo */
+  .navbar-inner { animation: navFadeIn 0.5s ease-out; }
+  @keyframes navFadeIn {
+    from { opacity: 0; transform: translateY(-10px); }
+    to { opacity: 1; transform: translateY(0); }
+  }
+</style>
 </head>
 <body>
 
-    <h1>Welcome to My Website</h1>
-    <p>This website is new deployed using Vercel.</p>
+<!-- Animated backgrounds -->
+<div class="bg-grid"></div>
+<div class="bg-blobs">
+  <div class="blob blob-1"></div>
+  <div class="blob blob-2"></div>
+  <div class="blob blob-3"></div>
+</div>
+<!-- Cursor-reactive spotlight -->
+<div class="spotlight" id="spotlight"></div>
 
-    <button onclick="showMessage()">Click Me</button>
+<!-- Navbar -->
+<nav class="navbar">
+  <div class="navbar-inner max-w-7xl mx-auto px-4 lg:px-8 h-16 flex items-center justify-between">
+    <a href="#overview" class="flex items-center gap-3" style="text-decoration: none;">
+      <!-- Professional custom logo: fused M + cloud monogram -->
+      <div class="brand-logo" aria-label="Async Playbook Logo">
+        <svg width="24" height="24" viewBox="0 0 40 40" fill="none" xmlns="http://www.w3.org/2000/svg">
+          <!-- Gradient definitions -->
+          <defs>
+            <linearGradient id="logoGradA" x1="0" y1="0" x2="40" y2="40" gradientUnits="userSpaceOnUse">
+              <stop offset="0%" stop-color="#ff3f6c"/>
+              <stop offset="100%" stop-color="#ff905a"/>
+            </linearGradient>
+            <linearGradient id="logoGradB" x1="0" y1="40" x2="40" y2="0" gradientUnits="userSpaceOnUse">
+              <stop offset="0%" stop-color="#1ab9ff"/>
+              <stop offset="100%" stop-color="#0176d3"/>
+            </linearGradient>
+          </defs>
+          <!-- Bold "M" strokes representing Myntra, stylized like a lightning bolt/circuit -->
+          <path d="M6 30 L6 12 L14 22 L20 14 L26 22 L34 12 L34 30"
+                stroke="url(#logoGradA)" stroke-width="3.2" stroke-linecap="round" stroke-linejoin="round" fill="none"/>
+          <!-- Orbiting async-signal dot on the right -->
+          <circle cx="34" cy="12" r="2.6" fill="url(#logoGradB)"/>
+          <!-- Async accent dot at bottom-left representing cloud callback -->
+          <circle cx="6" cy="30" r="2.2" fill="url(#logoGradA)"/>
+          <!-- Tiny spark dot for motion sense -->
+          <circle cx="20" cy="14" r="1.4" fill="#fff" opacity="0.9"/>
+        </svg>
+      </div>
+      <div class="hidden sm:block">
+        <div class="brand-wordmark">Async<span style="color: var(--text-mute); font-weight: 500;">/</span>Playbook</div>
+        <div class="text-[10px] font-medium tracking-[0.15em] uppercase" style="color: var(--text-mute);">Myntra × Salesforce</div>
+      </div>
+    </a>
 
-    <script src="script.js"></script>
+    <div class="hidden lg:flex items-center gap-1">
+      <a href="#overview" class="px-3 py-2 text-sm font-medium transition hover:text-white" style="color: var(--text-dim);">Overview</a>
+      <a href="#simulation" class="px-3 py-2 text-sm font-medium transition hover:text-white" style="color: var(--text-dim);">Simulation</a>
+      <a href="#matrix" class="px-3 py-2 text-sm font-medium transition hover:text-white" style="color: var(--text-dim);">Async Tools</a>
+      <a href="#architecture" class="px-3 py-2 text-sm font-medium transition hover:text-white" style="color: var(--text-dim);">Architecture</a>
+      <a href="#playground" class="px-3 py-2 text-sm font-medium transition hover:text-white" style="color: var(--text-dim);">Playground</a>
+      <a href="#quiz" class="px-3 py-2 text-sm font-medium transition hover:text-white" style="color: var(--text-dim);">Quiz</a>
+    </div>
+
+    <div class="flex items-center gap-3">
+      <div class="theme-toggle" data-action="toggle-theme" title="Toggle theme"></div>
+      <button class="lg:hidden p-2 rounded-lg" data-action="toggle-mobile-nav" style="background: var(--bg-2);">
+        <i data-lucide="menu" class="w-5 h-5" style="color: var(--text);"></i>
+      </button>
+    </div>
+  </div>
+
+  <!-- Mobile nav -->
+  <div id="mobile-nav" class="lg:hidden hidden px-4 pb-4" style="border-top: 1px solid var(--card-border); background: var(--bg-1);">
+    <div class="flex flex-col gap-1 pt-3">
+      <a href="#overview" class="px-3 py-2 text-sm font-medium rounded-lg" style="color: var(--text-dim);">Overview</a>
+      <a href="#simulation" class="px-3 py-2 text-sm font-medium rounded-lg" style="color: var(--text-dim);">Simulation</a>
+      <a href="#matrix" class="px-3 py-2 text-sm font-medium rounded-lg" style="color: var(--text-dim);">Async Tools</a>
+      <a href="#architecture" class="px-3 py-2 text-sm font-medium rounded-lg" style="color: var(--text-dim);">Architecture</a>
+      <a href="#playground" class="px-3 py-2 text-sm font-medium rounded-lg" style="color: var(--text-dim);">Playground</a>
+      <a href="#quiz" class="px-3 py-2 text-sm font-medium rounded-lg" style="color: var(--text-dim);">Quiz</a>
+    </div>
+  </div>
+</nav>
+
+<!-- HERO -->
+<header class="relative pt-24 pb-12 md:pt-28 md:pb-16 overflow-hidden" id="overview">
+  <div id="particles" class="absolute inset-0 pointer-events-none overflow-hidden"></div>
+
+  <!-- Floating orbital decoration -->
+  <div class="hero-orbit" aria-hidden="true">
+    <div class="core"></div>
+    <div class="ring"></div>
+    <div class="ring r2"></div>
+    <div class="ring r3"></div>
+    <div class="planet p1"><i data-lucide="zap" class="w-5 h-5"></i></div>
+    <div class="planet p2"><i data-lucide="cloud" class="w-5 h-5"></i></div>
+    <div class="planet p3"><i data-lucide="database" class="w-5 h-5"></i></div>
+    <div class="planet p4"><i data-lucide="git-branch" class="w-5 h-5"></i></div>
+  </div>
+
+  <div class="max-w-7xl mx-auto px-4 lg:px-8 relative">
+    <!-- Eyebrow with live indicator -->
+    <div class="hero-eyebrow">
+      <span class="dot"><i data-lucide="sparkles" class="w-3 h-3"></i></span>
+      <span class="pulse"></span>
+      <span>Interactive · Runs Entirely In Your Browser</span>
+    </div>
+
+    <div class="flex items-center gap-2 mb-4">
+      <span class="badge badge-async"><i data-lucide="zap" class="w-3 h-3"></i> Interactive Learning</span>
+      <span class="badge badge-sync"><i data-lucide="cloud" class="w-3 h-3"></i> Salesforce Apex</span>
+    </div>
+
+    <h1 class="text-3xl sm:text-4xl md:text-5xl lg:text-6xl font-extrabold leading-[1.1] tracking-tight mb-4">
+      When Myntra says <span class="grad-text">"Order Confirmed"</span><br />
+      what <span class="grad-text-sf">really happens</span> in Salesforce?
+    </h1>
+
+    <p class="text-base md:text-lg max-w-3xl mb-4" style="color: var(--text-dim);">
+      A visual, interactive playbook of the 4 async techniques — <strong>Triggers, @future, Batch, Schedulable, and Queueable chains</strong> —
+      that power e-commerce order processing at scale.
+    </p>
+
+    <div class="flex flex-wrap gap-3 mt-6">
+      <a href="#simulation" class="btn-primary inline-flex items-center gap-2">
+        <i data-lucide="play" class="w-4 h-4"></i> Run Simulation
+      </a>
+      <a href="#architecture" class="btn-ghost inline-flex items-center gap-2">
+        <i data-lucide="git-branch" class="w-4 h-4"></i> See Architecture
+      </a>
+      <a href="#playground" class="btn-ghost inline-flex items-center gap-2">
+        <i data-lucide="code-2" class="w-4 h-4"></i> Code Playground
+      </a>
+    </div>
+
+    <!-- Stat row -->
+    <div class="grid grid-cols-2 md:grid-cols-4 gap-3 mt-10">
+      <div class="glass stat-card p-4">
+        <div class="text-2xl md:text-3xl font-bold grad-text">4</div>
+        <div class="text-xs md:text-sm mt-1" style="color: var(--text-dim);">Async Techniques</div>
+      </div>
+      <div class="glass stat-card p-4">
+        <div class="text-2xl md:text-3xl font-bold grad-text">2.4M+</div>
+        <div class="text-xs md:text-sm mt-1" style="color: var(--text-dim);">Records / Batch Job</div>
+      </div>
+      <div class="glass stat-card p-4">
+        <div class="text-2xl md:text-3xl font-bold grad-text">&lt; 200ms</div>
+        <div class="text-xs md:text-sm mt-1" style="color: var(--text-dim);">User-facing latency</div>
+      </div>
+      <div class="glass stat-card p-4">
+        <div class="text-2xl md:text-3xl font-bold grad-text">100%</div>
+        <div class="text-xs md:text-sm mt-1" style="color: var(--text-dim);">Governor-limit safe</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Tech marquee -->
+  <div class="marquee" style="margin-top: 36px;">
+    <div class="marquee-track">
+      <!-- first copy -->
+      <div class="marquee-item"><i data-lucide="zap" class="w-4 h-4"></i> Apex Triggers</div>
+      <div class="marquee-item"><i data-lucide="clock" class="w-4 h-4"></i> @future Methods</div>
+      <div class="marquee-item"><i data-lucide="database" class="w-4 h-4"></i> Batch Apex</div>
+      <div class="marquee-item"><i data-lucide="calendar" class="w-4 h-4"></i> Schedulable</div>
+      <div class="marquee-item"><i data-lucide="link" class="w-4 h-4"></i> Queueable Chains</div>
+      <div class="marquee-item"><i data-lucide="shield-check" class="w-4 h-4"></i> Governor Limits</div>
+      <div class="marquee-item"><i data-lucide="git-branch" class="w-4 h-4"></i> Event Flow</div>
+      <div class="marquee-item"><i data-lucide="layers" class="w-4 h-4"></i> Transaction Design</div>
+      <!-- duplicate for seamless loop -->
+      <div class="marquee-item"><i data-lucide="zap" class="w-4 h-4"></i> Apex Triggers</div>
+      <div class="marquee-item"><i data-lucide="clock" class="w-4 h-4"></i> @future Methods</div>
+      <div class="marquee-item"><i data-lucide="database" class="w-4 h-4"></i> Batch Apex</div>
+      <div class="marquee-item"><i data-lucide="calendar" class="w-4 h-4"></i> Schedulable</div>
+      <div class="marquee-item"><i data-lucide="link" class="w-4 h-4"></i> Queueable Chains</div>
+      <div class="marquee-item"><i data-lucide="shield-check" class="w-4 h-4"></i> Governor Limits</div>
+      <div class="marquee-item"><i data-lucide="git-branch" class="w-4 h-4"></i> Event Flow</div>
+      <div class="marquee-item"><i data-lucide="layers" class="w-4 h-4"></i> Transaction Design</div>
+    </div>
+  </div>
+</header>
+
+<!-- MAIN LAYOUT -->
+<div class="max-w-7xl mx-auto px-4 lg:px-8 pb-32">
+  <div class="flex gap-8">
+
+    <!-- SIDE NAV -->
+    <aside class="sidenav hidden lg:block w-56 flex-shrink-0">
+      <div class="sticky top-24 py-4 glass-strong px-2">
+        <div class="px-3 pb-2 text-xs font-bold uppercase tracking-wider" style="color: var(--text-mute);">Sections</div>
+        <a href="#simulation" data-navlink><i data-lucide="play-circle" class="w-4 h-4"></i> Order Simulator</a>
+        <a href="#matrix" data-navlink><i data-lucide="layout-grid" class="w-4 h-4"></i> Decision Matrix</a>
+        <a href="#architecture" data-navlink><i data-lucide="git-branch" class="w-4 h-4"></i> Architecture</a>
+        <a href="#batch" data-navlink><i data-lucide="database" class="w-4 h-4"></i> Batch Job</a>
+        <a href="#scheduler" data-navlink><i data-lucide="clock" class="w-4 h-4"></i> Scheduler</a>
+        <a href="#chain" data-navlink><i data-lucide="link" class="w-4 h-4"></i> Queueable Chain</a>
+        <a href="#playground" data-navlink><i data-lucide="code-2" class="w-4 h-4"></i> Playground</a>
+        <a href="#quiz" data-navlink><i data-lucide="brain" class="w-4 h-4"></i> Quiz</a>
+      </div>
+    </aside>
+
+    <main class="flex-1 min-w-0 space-y-16">
+
+      <!-- 1. SIMULATOR -->
+      <section id="simulation" class="reveal">
+        <div class="flex items-center gap-4 mb-6">
+          <div class="step-num">1</div>
+          <div>
+            <h2 class="text-3xl md:text-4xl font-bold">Live Order Placement Simulator</h2>
+            <p class="text-sm mt-1" style="color: var(--text-dim);">Place an order and watch every sync + async step execute in real time.</p>
+          </div>
+        </div>
+
+        <div class="grid lg:grid-cols-5 gap-6">
+          <!-- Form -->
+          <div class="lg:col-span-2 glass-strong p-6">
+            <h3 class="font-semibold mb-4 flex items-center gap-2"><i data-lucide="shopping-cart" class="w-5 h-5" style="color: var(--myntra-pink);"></i> New Order</h3>
+
+            <div class="space-y-4">
+              <div>
+                <label class="text-xs font-semibold uppercase tracking-wide block mb-2" style="color: var(--text-mute);">Customer Name</label>
+                <input id="sim-customer" type="text" value="Priya Sharma" class="w-full px-4 py-3 rounded-xl text-sm font-medium" style="background: var(--bg-2); border: 1px solid var(--card-border); color: var(--text);" />
+              </div>
+              <div>
+                <label class="text-xs font-semibold uppercase tracking-wide block mb-2" style="color: var(--text-mute);">Product</label>
+                <select id="sim-product" class="w-full px-4 py-3 rounded-xl text-sm font-medium" style="background: var(--bg-2); border: 1px solid var(--card-border); color: var(--text);">
+                  <option>H&M Oversized Hoodie</option>
+                  <option>Nike Air Max 270</option>
+                  <option>Levi's 511 Slim Jeans</option>
+                  <option>Roadster Cotton T-shirt</option>
+                </select>
+              </div>
+              <div>
+                <label class="text-xs font-semibold uppercase tracking-wide block mb-2" style="color: var(--text-mute);">Order Amount (₹)</label>
+                <input id="sim-amount" type="number" value="2499" class="w-full px-4 py-3 rounded-xl text-sm font-medium" style="background: var(--bg-2); border: 1px solid var(--card-border); color: var(--text);" />
+              </div>
+
+              <button data-action="place-order" class="btn-primary w-full flex items-center justify-center gap-2">
+                <i data-lucide="zap" class="w-4 h-4"></i> Place Order
+              </button>
+
+              <!-- Timer -->
+              <div class="glass p-4 flex items-center justify-between">
+                <div>
+                  <div class="text-xs uppercase font-semibold tracking-wide" style="color: var(--text-mute);">User Transaction Time</div>
+                  <div class="text-xs mt-1" style="color: var(--text-dim);">(Sync steps only — async runs in background)</div>
+                </div>
+                <div class="counter-display" id="sim-timer">0ms</div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Pipeline -->
+          <div class="lg:col-span-3 glass-strong p-6">
+            <h3 class="font-semibold mb-4 flex items-center gap-2"><i data-lucide="activity" class="w-5 h-5" style="color: var(--sf-sky);"></i> Execution Pipeline</h3>
+
+            <div class="space-y-3" id="pipeline">
+              <div class="pipe-step" data-step="0">
+                <div class="pipe-icon"><i data-lucide="file-plus" class="w-5 h-5"></i></div>
+                <div class="flex-1">
+                  <div class="font-semibold text-sm">Order__c record created</div>
+                  <div class="text-xs" style="color: var(--text-dim);">Standard DML — Status = 'Confirmed'</div>
+                </div>
+                <span class="badge badge-sync">Sync</span>
+                <div class="code-popup">insert order;</div>
+              </div>
+              <div class="pipe-step" data-step="1">
+                <div class="pipe-icon"><i data-lucide="zap" class="w-5 h-5"></i></div>
+                <div class="flex-1">
+                  <div class="font-semibold text-sm">after update trigger fires</div>
+                  <div class="text-xs" style="color: var(--text-dim);">OrderTrigger → OrderTriggerHandler.afterUpdate()</div>
+                </div>
+                <span class="badge badge-sync">Sync</span>
+                <div class="code-popup">trigger OrderTrigger on Order__c</div>
+              </div>
+              <div class="pipe-step" data-step="2">
+                <div class="pipe-icon"><i data-lucide="user-check" class="w-5 h-5"></i></div>
+                <div class="flex-1">
+                  <div class="font-semibold text-sm">Account marked "Active Buyer"</div>
+                  <div class="text-xs" style="color: var(--text-dim);">update customerAccount;</div>
+                </div>
+                <span class="badge badge-sync">Sync</span>
+                <div class="code-popup">acc.Is_Active_Buyer__c = true;</div>
+              </div>
+              <div class="pipe-step" data-step="3">
+                <div class="pipe-icon"><i data-lucide="clipboard-list" class="w-5 h-5"></i></div>
+                <div class="flex-1">
+                  <div class="font-semibold text-sm">Follow-up Task created for sales</div>
+                  <div class="text-xs" style="color: var(--text-dim);">insert new Task(WhatId = order.Id)</div>
+                </div>
+                <span class="badge badge-sync">Sync</span>
+                <div class="code-popup">insert followUpTask;</div>
+              </div>
+              <div class="pipe-step" data-step="4">
+                <div class="pipe-icon"><i data-lucide="send" class="w-5 h-5"></i></div>
+                <div class="flex-1">
+                  <div class="font-semibold text-sm">@future callout to Warehouse API</div>
+                  <div class="text-xs" style="color: var(--text-dim);">WarehouseService.sendOrder(orderId)</div>
+                </div>
+                <span class="badge badge-async">Async</span>
+                <div class="code-popup">@future(callout=true)</div>
+              </div>
+              <div class="pipe-step" data-step="5">
+                <div class="pipe-icon"><i data-lucide="link-2" class="w-5 h-5"></i></div>
+                <div class="flex-1">
+                  <div class="font-semibold text-sm">Queueable chain enqueued</div>
+                  <div class="text-xs" style="color: var(--text-dim);">Inventory → Notify → Log</div>
+                </div>
+                <span class="badge badge-async">Async</span>
+                <div class="code-popup">System.enqueueJob(new InventoryUpdateJob());</div>
+              </div>
+            </div>
+
+            <div id="sim-result" class="mt-5 hidden callout">
+              <div class="flex items-start gap-3">
+                <i data-lucide="check-circle-2" class="w-5 h-5 flex-shrink-0 mt-0.5" style="color: #22c55e;"></i>
+                <div>
+                  <div class="font-semibold text-sm">Order processed successfully</div>
+                  <div class="text-xs mt-1" style="color: var(--text-dim);">User saw the confirmation in <strong id="sim-user-ms">—</strong> — but background work continues asynchronously.</div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- 2. DECISION MATRIX -->
+      <section id="matrix" class="reveal">
+        <div class="flex items-center gap-4 mb-6">
+          <div class="step-num">2</div>
+          <div>
+            <h2 class="text-3xl md:text-4xl font-bold">Async Tool Decision Matrix</h2>
+            <p class="text-sm mt-1" style="color: var(--text-dim);">Click any row to reveal the real Apex implementation.</p>
+          </div>
+        </div>
+
+        <div class="glass-strong overflow-hidden">
+          <div class="overflow-x-auto">
+            <table class="w-full text-sm">
+              <thead>
+                <tr style="background: var(--bg-2);">
+                  <th class="text-left px-5 py-4 font-semibold" style="color: var(--text-dim);">Technique</th>
+                  <th class="text-left px-5 py-4 font-semibold" style="color: var(--text-dim);">Myntra Use Case</th>
+                  <th class="text-left px-5 py-4 font-semibold" style="color: var(--text-dim);">Type</th>
+                  <th class="text-left px-5 py-4 font-semibold hidden md:table-cell" style="color: var(--text-dim);">Governor Limit Benefit</th>
+                  <th class="px-5 py-4"></th>
+                </tr>
+              </thead>
+              <tbody id="matrix-body">
+                <!-- injected by JS -->
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </section>
+
+      <!-- 3. ARCHITECTURE -->
+      <section id="architecture" class="reveal">
+        <div class="flex items-center gap-4 mb-6">
+          <div class="step-num">3</div>
+          <div>
+            <h2 class="text-3xl md:text-4xl font-bold">Architecture Flow Diagram</h2>
+            <p class="text-sm mt-1" style="color: var(--text-dim);">Hover any node. Animated dots show data flowing through each path.</p>
+          </div>
+        </div>
+
+        <div class="glass-strong p-4 md:p-6 relative">
+          <div class="flex flex-wrap gap-3 mb-4">
+            <span class="badge badge-sync"><span class="w-2 h-2 rounded-full" style="background: var(--sf-sky);"></span> Sync path</span>
+            <span class="badge badge-async"><span class="w-2 h-2 rounded-full" style="background: var(--myntra-pink);"></span> Async path</span>
+            <span class="badge" style="background: color-mix(in srgb, #facc15 18%, transparent); color: #facc15;"><span class="w-2 h-2 rounded-full" style="background: #facc15;"></span> Scheduled</span>
+          </div>
+
+          <div class="overflow-x-auto">
+            <svg viewBox="0 0 1000 560" class="w-full" style="min-width: 860px;" id="arch-svg">
+              <!-- defs -->
+              <defs>
+                <marker id="arrow" markerWidth="10" markerHeight="10" refX="9" refY="5" orient="auto">
+                  <path d="M0,0 L10,5 L0,10 Z" fill="var(--text-mute)"/>
+                </marker>
+                <marker id="arrow-pink" markerWidth="10" markerHeight="10" refX="9" refY="5" orient="auto">
+                  <path d="M0,0 L10,5 L0,10 Z" fill="var(--myntra-pink)"/>
+                </marker>
+                <marker id="arrow-blue" markerWidth="10" markerHeight="10" refX="9" refY="5" orient="auto">
+                  <path d="M0,0 L10,5 L0,10 Z" fill="var(--sf-sky)"/>
+                </marker>
+              </defs>
+
+              <!-- Paths (drawn first so behind nodes) -->
+              <path d="M 130 80 L 220 80" class="arch-path arch-path-flow" marker-end="url(#arrow)" />
+              <path d="M 380 80 L 470 80" class="arch-path arch-path-flow" marker-end="url(#arrow)" />
+
+              <!-- From Trigger to sync lane (top right) -->
+              <path d="M 560 60 Q 620 30 700 50 L 780 50" class="arch-path arch-path-flow" stroke="var(--sf-sky)" marker-end="url(#arrow-blue)" />
+              <path d="M 560 80 Q 620 80 700 110 L 780 110" class="arch-path arch-path-flow" stroke="var(--sf-sky)" marker-end="url(#arrow-blue)" />
+
+              <!-- From Trigger to async (middle) -->
+              <path d="M 560 100 Q 620 160 700 180 L 780 180" class="arch-path arch-path-flow" stroke="var(--myntra-pink)" marker-end="url(#arrow-pink)" />
+
+              <!-- From Trigger to queueable chain -->
+              <path d="M 530 110 L 530 240" class="arch-path arch-path-flow" stroke="var(--myntra-pink)" marker-end="url(#arrow-pink)" />
+              <path d="M 620 270 L 750 270" class="arch-path arch-path-flow" stroke="var(--myntra-pink)" marker-end="url(#arrow-pink)" />
+              <path d="M 620 270 L 620 330" class="arch-path arch-path-flow" stroke="var(--myntra-pink)" />
+              <path d="M 620 330 L 530 330 L 530 360" class="arch-path arch-path-flow" stroke="var(--myntra-pink)" marker-end="url(#arrow-pink)" />
+
+              <!-- Queueable chain arrows -->
+              <path d="M 230 410 L 320 410" class="arch-path arch-path-flow" stroke="var(--myntra-pink)" marker-end="url(#arrow-pink)" />
+              <path d="M 470 410 L 560 410" class="arch-path arch-path-flow" stroke="var(--myntra-pink)" marker-end="url(#arrow-pink)" />
+
+              <!-- Batch + schedule lanes -->
+              <path d="M 880 410 L 880 490" class="arch-path arch-path-flow" stroke="#facc15" marker-end="url(#arrow)" />
+
+              <!-- Nodes -->
+              <!-- User -->
+              <g class="arch-node-group" data-tip="Customer places order via Myntra app">
+                <rect x="30" y="50" width="100" height="60" rx="12" class="arch-node" />
+                <text x="80" y="80" text-anchor="middle" class="arch-node-text">👤 User</text>
+                <text x="80" y="96" text-anchor="middle" class="arch-node-sub">Myntra App</text>
+              </g>
+              <!-- Order Object -->
+              <g class="arch-node-group" data-tip="Custom Object: Order__c — central record">
+                <rect x="220" y="50" width="160" height="60" rx="12" class="arch-node" stroke="var(--sf-sky)" />
+                <text x="300" y="80" text-anchor="middle" class="arch-node-text">Order__c Object</text>
+                <text x="300" y="96" text-anchor="middle" class="arch-node-sub">Status → Confirmed</text>
+              </g>
+              <!-- Trigger -->
+              <g class="arch-node-group" data-tip="after update trigger — entry point">
+                <rect x="470" y="50" width="160" height="60" rx="12" class="arch-node" stroke="var(--myntra-pink)" />
+                <text x="550" y="80" text-anchor="middle" class="arch-node-text">OrderTrigger</text>
+                <text x="550" y="96" text-anchor="middle" class="arch-node-sub">after update</text>
+              </g>
+
+              <!-- Sync: Account update -->
+              <g class="arch-node-group" data-tip="Synchronous DML on Account">
+                <rect x="780" y="20" width="180" height="60" rx="12" class="arch-node" stroke="var(--sf-sky)" />
+                <text x="870" y="50" text-anchor="middle" class="arch-node-text">Account Update</text>
+                <text x="870" y="66" text-anchor="middle" class="arch-node-sub">Mark Active Buyer</text>
+              </g>
+              <!-- Sync: Task -->
+              <g class="arch-node-group" data-tip="Task for sales team">
+                <rect x="780" y="90" width="180" height="60" rx="12" class="arch-node" stroke="var(--sf-sky)" />
+                <text x="870" y="120" text-anchor="middle" class="arch-node-text">Follow-up Task</text>
+                <text x="870" y="136" text-anchor="middle" class="arch-node-sub">Sales follow-up</text>
+              </g>
+              <!-- Async: Warehouse -->
+              <g class="arch-node-group" data-tip="@future callout — non-blocking HTTP">
+                <rect x="780" y="160" width="180" height="60" rx="12" class="arch-node" stroke="var(--myntra-pink)" />
+                <text x="870" y="190" text-anchor="middle" class="arch-node-text">Warehouse API</text>
+                <text x="870" y="206" text-anchor="middle" class="arch-node-sub">@future callout</text>
+              </g>
+
+              <!-- Queueable chain -->
+              <g class="arch-node-group" data-tip="Queueable Chain start: Inventory">
+                <rect x="470" y="240" width="150" height="60" rx="12" class="arch-node" stroke="var(--myntra-pink)" />
+                <text x="545" y="270" text-anchor="middle" class="arch-node-text">Inventory Update</text>
+                <text x="545" y="286" text-anchor="middle" class="arch-node-sub">Queueable #1</text>
+              </g>
+              <g class="arch-node-group" data-tip="Queueable Chain #2: External notification">
+                <rect x="750" y="240" width="150" height="60" rx="12" class="arch-node" stroke="var(--myntra-pink)" />
+                <text x="825" y="270" text-anchor="middle" class="arch-node-text">External Notify</text>
+                <text x="825" y="286" text-anchor="middle" class="arch-node-sub">Queueable #2</text>
+              </g>
+              <g class="arch-node-group" data-tip="Queueable Chain #3: Confirmation log">
+                <rect x="455" y="360" width="150" height="60" rx="12" class="arch-node" stroke="var(--myntra-pink)" />
+                <text x="530" y="390" text-anchor="middle" class="arch-node-text">Confirmation Log</text>
+                <text x="530" y="406" text-anchor="middle" class="arch-node-sub">Queueable #3</text>
+              </g>
+
+              <!-- Batch lane -->
+              <g class="arch-node-group" data-tip="Batch Apex — processes millions in chunks of 200">
+                <rect x="50" y="380" width="180" height="60" rx="12" class="arch-node" stroke="#facc15" />
+                <text x="140" y="410" text-anchor="middle" class="arch-node-text">Batch: Inactive Customers</text>
+                <text x="140" y="426" text-anchor="middle" class="arch-node-sub">2.4M records / 200 chunks</text>
+              </g>
+              <g class="arch-node-group" data-tip="Customer records scanned">
+                <rect x="320" y="380" width="150" height="60" rx="12" class="arch-node" />
+                <text x="395" y="410" text-anchor="middle" class="arch-node-text">Customer__c</text>
+                <text x="395" y="426" text-anchor="middle" class="arch-node-sub">Historical data</text>
+              </g>
+              <g class="arch-node-group" data-tip="Flag inactive customers">
+                <rect x="560" y="380" width="180" height="60" rx="12" class="arch-node" stroke="#facc15" />
+                <text x="650" y="410" text-anchor="middle" class="arch-node-text">Mark Inactive</text>
+                <text x="650" y="426" text-anchor="middle" class="arch-node-sub">No purchase in 1 year</text>
+              </g>
+
+              <!-- Schedule lane -->
+              <g class="arch-node-group" data-tip="Schedulable Apex — cron: 0 0 2 * * ?">
+                <rect x="800" y="380" width="160" height="60" rx="12" class="arch-node" stroke="#facc15" />
+                <text x="880" y="410" text-anchor="middle" class="arch-node-text">Nightly Cleanup</text>
+                <text x="880" y="426" text-anchor="middle" class="arch-node-sub">Schedulable · 2:00 AM</text>
+              </g>
+              <g class="arch-node-group" data-tip="Cart + Wishlist records older than 6 months">
+                <rect x="800" y="490" width="160" height="50" rx="12" class="arch-node" />
+                <text x="880" y="515" text-anchor="middle" class="arch-node-text">Cart/Wishlist (old)</text>
+                <text x="880" y="530" text-anchor="middle" class="arch-node-sub">&gt; 6 months → deleted</text>
+              </g>
+
+              <!-- Flowing dots -->
+              <circle r="4" class="arch-dot">
+                <animateMotion dur="3s" repeatCount="indefinite" path="M 130 80 L 220 80" />
+              </circle>
+              <circle r="4" class="arch-dot">
+                <animateMotion dur="3s" repeatCount="indefinite" begin="0.5s" path="M 380 80 L 470 80" />
+              </circle>
+              <circle r="4" class="arch-dot" style="fill: var(--sf-sky)">
+                <animateMotion dur="3.5s" repeatCount="indefinite" path="M 560 60 Q 620 30 700 50 L 780 50" />
+              </circle>
+              <circle r="4" class="arch-dot" style="fill: var(--sf-sky)">
+                <animateMotion dur="3.5s" repeatCount="indefinite" begin="0.8s" path="M 560 80 Q 620 80 700 110 L 780 110" />
+              </circle>
+              <circle r="4" class="arch-dot">
+                <animateMotion dur="4s" repeatCount="indefinite" begin="0.3s" path="M 560 100 Q 620 160 700 180 L 780 180" />
+              </circle>
+              <circle r="4" class="arch-dot">
+                <animateMotion dur="4s" repeatCount="indefinite" begin="1s" path="M 530 110 L 530 240" />
+              </circle>
+              <circle r="4" class="arch-dot">
+                <animateMotion dur="3.5s" repeatCount="indefinite" begin="1.5s" path="M 620 270 L 750 270" />
+              </circle>
+              <circle r="4" class="arch-dot" style="fill: #facc15">
+                <animateMotion dur="3s" repeatCount="indefinite" path="M 230 410 L 320 410" />
+              </circle>
+              <circle r="4" class="arch-dot" style="fill: #facc15">
+                <animateMotion dur="3s" repeatCount="indefinite" begin="0.7s" path="M 470 410 L 560 410" />
+              </circle>
+              <circle r="4" class="arch-dot" style="fill: #facc15">
+                <animateMotion dur="4s" repeatCount="indefinite" path="M 880 440 L 880 490" />
+              </circle>
+            </svg>
+          </div>
+
+          <div class="tooltip" id="arch-tooltip"></div>
+        </div>
+
+        <div class="callout mt-5">
+          <div class="flex items-start gap-3">
+            <i data-lucide="info" class="w-5 h-5 flex-shrink-0 mt-0.5" style="color: var(--sf-sky);"></i>
+            <div class="text-sm">
+              <strong>Why this split matters:</strong> Everything the user waits for (Account + Task) runs synchronously. Everything external or heavy
+              (warehouse callout, inventory updates, logging) runs asynchronously so the "Order Confirmed" response returns in milliseconds.
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- 4. BATCH SIMULATOR -->
+      <section id="batch" class="reveal">
+        <div class="flex items-center gap-4 mb-6">
+          <div class="step-num">4</div>
+          <div>
+            <h2 class="text-3xl md:text-4xl font-bold">Batch Job Simulator</h2>
+            <p class="text-sm mt-1" style="color: var(--text-dim);">Scan 2.4M customers in chunks of 200 and mark inactive buyers.</p>
+          </div>
+        </div>
+
+        <div class="grid lg:grid-cols-2 gap-6">
+          <div class="glass-strong p-6">
+            <div class="flex items-center justify-between mb-5">
+              <div>
+                <div class="text-xs uppercase font-semibold tracking-wide" style="color: var(--text-mute);">Total Records</div>
+                <div class="counter-display" id="batch-total">2,450,000</div>
+              </div>
+              <div class="text-right">
+                <div class="text-xs uppercase font-semibold tracking-wide" style="color: var(--text-mute);">Chunks (200)</div>
+                <div class="counter-display" id="batch-chunks">12,250</div>
+              </div>
+            </div>
+
+            <div class="progress-track mb-3">
+              <div class="progress-fill" id="batch-progress"></div>
+            </div>
+
+            <div class="flex justify-between text-xs mb-6" style="color: var(--text-dim);">
+              <span>Processed: <strong id="batch-processed">0</strong></span>
+              <span>Inactive Found: <strong id="batch-inactive" style="color: var(--myntra-pink);">0</strong></span>
+            </div>
+
+            <button data-action="run-batch" class="btn-primary w-full flex items-center justify-center gap-2" id="batch-btn">
+              <i data-lucide="play" class="w-4 h-4"></i> Run Batch Job
+            </button>
+
+            <div class="callout-warn mt-5 text-xs">
+              <strong>Governor Limit Benefit:</strong> Batch Apex resets limits for <em>every</em> chunk of 200. You can query 50M records total without hitting SOQL limits.
+            </div>
+          </div>
+
+          <div class="glass-strong p-6">
+            <h4 class="font-semibold mb-3 flex items-center gap-2"><i data-lucide="code-2" class="w-4 h-4" style="color: var(--sf-sky);"></i> Batch Apex Skeleton</h4>
+            <div class="code-wrap">
+              <button class="copy-btn" data-copy-target="batch-code"><i data-lucide="copy" class="w-3 h-3"></i> Copy</button>
+              <pre><code id="batch-code" class="language-apex">public class InactiveCustomerBatch implements Database.Batchable&lt;SObject&gt; {
+
+    public Database.QueryLocator start(Database.BatchableContext bc) {
+        Date cutoff = Date.today().addMonths(-12);
+        return Database.getQueryLocator(
+            'SELECT Id, Last_Order_Date__c, Is_Active_Buyer__c ' +
+            'FROM Customer__c WHERE Last_Order_Date__c &lt; :cutoff'
+        );
+    }
+
+    public void execute(Database.BatchableContext bc, List&lt;Customer__c&gt; scope) {
+        for (Customer__c c : scope) {
+            c.Is_Active_Buyer__c = false;
+            c.Inactive_Flagged_On__c = Date.today();
+        }
+        update scope;
+    }
+
+    public void finish(Database.BatchableContext bc) {
+        // Notify admin, chain next job, etc.
+    }
+}
+// Execute:  Database.executeBatch(new InactiveCustomerBatch(), 200);</code></pre>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- 5. SCHEDULER -->
+      <section id="scheduler" class="reveal">
+        <div class="flex items-center gap-4 mb-6">
+          <div class="step-num">5</div>
+          <div>
+            <h2 class="text-3xl md:text-4xl font-bold">Scheduler Visualizer</h2>
+            <p class="text-sm mt-1" style="color: var(--text-dim);">Nightly at 2:00 AM — delete Cart &amp; Wishlist records older than 6 months.</p>
+          </div>
+        </div>
+
+        <div class="grid lg:grid-cols-3 gap-6">
+          <div class="glass-strong p-6 text-center">
+            <div class="text-xs uppercase font-semibold tracking-wide mb-4" style="color: var(--text-mute);">Scheduled Run Clock</div>
+            <div class="clock-face" id="clock-face">
+              <div class="clock-hand hand-hour" id="hand-hour"></div>
+              <div class="clock-hand hand-min" id="hand-min"></div>
+              <div class="clock-hand hand-sec" id="hand-sec"></div>
+              <div class="clock-center"></div>
+            </div>
+            <div class="mt-3 font-mono text-sm font-semibold" id="clock-digital" style="color: var(--text-dim); font-variant-numeric: tabular-nums; letter-spacing: 0.05em;">--:--:--</div>
+            <div class="mt-5">
+              <div class="text-xs uppercase font-semibold tracking-wide" style="color: var(--text-mute);">Next Run</div>
+              <div class="text-xl font-bold mt-1">Tomorrow · <span style="color: var(--myntra-pink);">2:00 AM IST</span></div>
+            </div>
+            <div class="mt-4 inline-flex items-center gap-2 px-3 py-2 rounded-lg font-mono text-xs" style="background: var(--bg-2); border: 1px solid var(--card-border);">
+              <i data-lucide="clock-4" class="w-3 h-3" style="color: var(--sf-sky);"></i>
+              <span style="color: var(--text-dim);">cron:</span>
+              <span style="color: var(--myntra-pink);">0 0 2 * * ?</span>
+            </div>
+          </div>
+
+          <div class="glass-strong p-6 lg:col-span-2">
+            <div class="flex items-center justify-between mb-4">
+              <h4 class="font-semibold">Cart &amp; Wishlist Records</h4>
+              <button data-action="run-schedule" class="btn-primary text-sm" id="sched-btn">
+                <i data-lucide="play" class="w-3 h-3 inline mr-1"></i> Simulate Nightly Run
+              </button>
+            </div>
+            <div class="space-y-2 max-h-80 overflow-y-auto pr-2" id="cart-list">
+              <!-- injected -->
+            </div>
+            <div class="mt-4 text-xs" style="color: var(--text-dim);">
+              Records older than <strong>6 months</strong> get pruned. Fresh ones stay untouched.
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- 6. QUEUEABLE CHAIN -->
+      <section id="chain" class="reveal">
+        <div class="flex items-center gap-4 mb-6">
+          <div class="step-num">6</div>
+          <div>
+            <h2 class="text-3xl md:text-4xl font-bold">Queueable Chain Visualizer</h2>
+            <p class="text-sm mt-1" style="color: var(--text-dim);">Sequential dependent jobs — each enqueues the next.</p>
+          </div>
+        </div>
+
+        <div class="glass-strong p-6">
+          <div class="grid md:grid-cols-5 gap-4 items-center">
+            <div class="chain-node md:col-span-1" id="chain-1">
+              <div class="flex items-center gap-3 mb-2">
+                <div class="w-9 h-9 rounded-lg flex items-center justify-center" style="background: color-mix(in srgb, var(--sf-blue) 15%, transparent); color: var(--sf-sky);">
+                  <i data-lucide="package" class="w-4 h-4"></i>
+                </div>
+                <div class="text-xs font-semibold" style="color: var(--text-mute);">STEP 1</div>
+              </div>
+              <div class="font-semibold text-sm">Inventory Update</div>
+              <div class="text-xs mt-1" style="color: var(--text-dim);">Decrement stock</div>
+              <div class="mt-2 text-xs font-mono" style="color: var(--text-mute);" id="chain-1-status">idle</div>
+            </div>
+            <div class="chain-arrow text-center" id="arrow-1">
+              <i data-lucide="arrow-right" class="w-6 h-6 mx-auto hidden md:block"></i>
+              <i data-lucide="arrow-down" class="w-6 h-6 mx-auto md:hidden"></i>
+            </div>
+            <div class="chain-node md:col-span-1" id="chain-2">
+              <div class="flex items-center gap-3 mb-2">
+                <div class="w-9 h-9 rounded-lg flex items-center justify-center" style="background: color-mix(in srgb, var(--myntra-pink) 15%, transparent); color: var(--myntra-pink);">
+                  <i data-lucide="bell" class="w-4 h-4"></i>
+                </div>
+                <div class="text-xs font-semibold" style="color: var(--text-mute);">STEP 2</div>
+              </div>
+              <div class="font-semibold text-sm">External Notify</div>
+              <div class="text-xs mt-1" style="color: var(--text-dim);">3rd-party webhook</div>
+              <div class="mt-2 text-xs font-mono" style="color: var(--text-mute);" id="chain-2-status">idle</div>
+            </div>
+            <div class="chain-arrow text-center" id="arrow-2">
+              <i data-lucide="arrow-right" class="w-6 h-6 mx-auto hidden md:block"></i>
+              <i data-lucide="arrow-down" class="w-6 h-6 mx-auto md:hidden"></i>
+            </div>
+            <div class="chain-node md:col-span-1" id="chain-3">
+              <div class="flex items-center gap-3 mb-2">
+                <div class="w-9 h-9 rounded-lg flex items-center justify-center" style="background: color-mix(in srgb, var(--myntra-coral) 15%, transparent); color: var(--myntra-coral);">
+                  <i data-lucide="file-check-2" class="w-4 h-4"></i>
+                </div>
+                <div class="text-xs font-semibold" style="color: var(--text-mute);">STEP 3</div>
+              </div>
+              <div class="font-semibold text-sm">Confirmation Log</div>
+              <div class="text-xs mt-1" style="color: var(--text-dim);">Audit record</div>
+              <div class="mt-2 text-xs font-mono" style="color: var(--text-mute);" id="chain-3-status">idle</div>
+            </div>
+          </div>
+
+          <div class="flex flex-col sm:flex-row justify-center items-center gap-3 mt-6">
+            <button data-action="start-chain" id="chain-btn" class="btn-primary flex items-center gap-2">
+              <i data-lucide="play" class="w-4 h-4"></i> Start Chain
+            </button>
+            <span id="chain-cycle" class="hidden px-3 py-1.5 rounded-full text-xs font-mono font-semibold"
+                  style="background: color-mix(in srgb, var(--sf-sky) 15%, transparent); color: var(--sf-sky); border: 1px solid color-mix(in srgb, var(--sf-sky) 30%, transparent);">
+              Cycle #0
+            </span>
+            <span class="text-xs" style="color: var(--text-mute);">
+              <i data-lucide="info" class="w-3 h-3 inline"></i>
+              Chain loops infinitely — click again to stop
+            </span>
+          </div>
+
+          <div class="mt-6 code-wrap">
+            <button class="copy-btn" data-copy-target="chain-code"><i data-lucide="copy" class="w-3 h-3"></i> Copy</button>
+            <pre><code id="chain-code" class="language-apex">public class InventoryUpdateJob implements Queueable, Database.AllowsCallouts {
+    private Id orderId;
+    public InventoryUpdateJob(Id orderId) { this.orderId = orderId; }
+
+    public void execute(QueueableContext ctx) {
+        // 1. Update inventory
+        update [SELECT Id, Stock__c FROM Product__c WHERE Id IN :getProductIds()];
+
+        // 2. Enqueue the next job in the chain
+        if (!Test.isRunningTest()) {
+            System.enqueueJob(new ExternalNotifyJob(orderId));
+        }
+    }
+}</code></pre>
+          </div>
+
+          <div class="callout mt-4 text-xs">
+            <strong>Why chain instead of @future?</strong> Queueables accept Apex objects as params, support chaining, and give you a jobId to monitor — @future can't do any of that.
+          </div>
+        </div>
+      </section>
+
+      <!-- 7. PLAYGROUND -->
+      <section id="playground" class="reveal">
+        <div class="flex items-center gap-4 mb-6">
+          <div class="step-num">7</div>
+          <div>
+            <h2 class="text-3xl md:text-4xl font-bold">Code Playground</h2>
+            <p class="text-sm mt-1" style="color: var(--text-dim);">Copy-paste-ready Apex for every technique.</p>
+          </div>
+        </div>
+
+        <div class="glass-strong p-4 md:p-6">
+          <div class="flex gap-2 mb-4 overflow-x-auto pb-2" id="code-tabs"></div>
+          <div id="code-content">
+            <div class="code-wrap">
+              <button class="copy-btn" data-copy-target="playground-code"><i data-lucide="copy" class="w-3 h-3"></i> Copy</button>
+              <pre><code id="playground-code" class="language-apex"></code></pre>
+            </div>
+            <div id="code-meta" class="mt-4"></div>
+          </div>
+        </div>
+      </section>
+
+      <!-- 8. QUIZ -->
+      <section id="quiz" class="reveal">
+        <div class="flex items-center gap-4 mb-6">
+          <div class="step-num">8</div>
+          <div>
+            <h2 class="text-3xl md:text-4xl font-bold">Knowledge Quiz</h2>
+            <p class="text-sm mt-1" style="color: var(--text-dim);">Test yourself on when to use each async tool.</p>
+          </div>
+        </div>
+
+        <div class="glass-strong p-6 md:p-8">
+          <div class="flex items-center justify-between mb-6 pb-4" style="border-bottom: 1px solid var(--card-border);">
+            <div>
+              <div class="text-xs uppercase font-semibold tracking-wide" style="color: var(--text-mute);">Question</div>
+              <div class="text-xl font-bold mt-1"><span id="q-current">1</span> / <span id="q-total">5</span></div>
+            </div>
+            <div class="text-right">
+              <div class="text-xs uppercase font-semibold tracking-wide" style="color: var(--text-mute);">Score</div>
+              <div class="counter-display text-2xl" id="q-score">0</div>
+            </div>
+            <div class="text-right">
+              <div class="text-xs uppercase font-semibold tracking-wide" style="color: var(--text-mute);">Best</div>
+              <div class="counter-display text-2xl" id="q-best">0</div>
+            </div>
+          </div>
+
+          <div id="quiz-body"></div>
+        </div>
+      </section>
+
+      <!-- Footer -->
+      <div class="divider-gradient my-10"></div>
+      <footer class="pb-10" style="color: var(--text-mute);">
+        <div class="flex flex-col md:flex-row items-center justify-between gap-4 text-sm">
+          <div class="flex items-center gap-3">
+            <div class="brand-logo" style="width: 34px; height: 34px;">
+              <svg width="20" height="20" viewBox="0 0 40 40" fill="none" xmlns="http://www.w3.org/2000/svg">
+                <defs>
+                  <linearGradient id="fLogoA" x1="0" y1="0" x2="40" y2="40" gradientUnits="userSpaceOnUse">
+                    <stop offset="0%" stop-color="#ff3f6c"/><stop offset="100%" stop-color="#ff905a"/>
+                  </linearGradient>
+                  <linearGradient id="fLogoB" x1="0" y1="40" x2="40" y2="0" gradientUnits="userSpaceOnUse">
+                    <stop offset="0%" stop-color="#1ab9ff"/><stop offset="100%" stop-color="#0176d3"/>
+                  </linearGradient>
+                </defs>
+                <path d="M6 30 L6 12 L14 22 L20 14 L26 22 L34 12 L34 30" stroke="url(#fLogoA)" stroke-width="3.2" stroke-linecap="round" stroke-linejoin="round" fill="none"/>
+                <circle cx="34" cy="12" r="2.6" fill="url(#fLogoB)"/>
+                <circle cx="6" cy="30" r="2.2" fill="url(#fLogoA)"/>
+              </svg>
+            </div>
+            <div>
+              <div class="font-semibold" style="color: var(--text);">Async Playbook</div>
+              <div class="text-xs">Salesforce Apex × Myntra e-commerce scenarios</div>
+            </div>
+          </div>
+          <div class="text-center md:text-right">
+            <div>Every simulation runs entirely in your browser.</div>
+            <div class="mt-1">Developed with <span style="color: var(--myntra-pink);">♥</span> by <strong style="background: linear-gradient(95deg, var(--myntra-pink), var(--sf-sky)); -webkit-background-clip: text; background-clip: text; -webkit-text-fill-color: transparent; font-weight: 800;">Ayush</strong></div>
+          </div>
+        </div>
+      </footer>
+    </main>
+  </div>
+</div>
+
+<!-- Floating "Developed by Ayush" badge (bottom-right) -->
+<a href="#overview" class="dev-badge" title="Back to top · Developed by Ayush">
+  <span class="dev-avatar">A</span>
+  <span>Developed by <strong>Ayush</strong></span>
+</a>
+
+<script>
+/* ============================================================
+   STATE
+============================================================ */
+const state = {
+  simRunning: false,
+  batchRunning: false,
+  schedRunning: false,
+  chainRunning: false,
+  chainStopRequested: false,
+  chainCycle: 0,
+  clockFrozen: false,
+  clockInterval: null,
+  quiz: { idx: 0, score: 0, best: 0, done: false, locked: false },
+  matrixOpen: null,
+  activeCodeTab: 'trigger',
+};
+
+/* ============================================================
+   DATA
+============================================================ */
+const matrixData = [
+  {
+    id: 'trigger',
+    name: 'Trigger + Apex',
+    icon: 'zap',
+    usecase: 'Real-time Account + Task update on Order confirmation',
+    type: 'sync',
+    benefit: 'Runs in same transaction — guaranteed atomicity',
+    code: `trigger OrderTrigger on Order__c (after update) {
+    OrderTriggerHandler.handleAfterUpdate(Trigger.new, Trigger.oldMap);
+}
+
+public class OrderTriggerHandler {
+    public static void handleAfterUpdate(List<Order__c> newList, Map<Id, Order__c> oldMap) {
+        Set<Id> accountIds = new Set<Id>();
+        List<Task> tasks = new List<Task>();
+
+        for (Order__c o : newList) {
+            Order__c oldOrder = oldMap.get(o.Id);
+            if (o.Status__c == 'Confirmed' && oldOrder.Status__c != 'Confirmed') {
+                accountIds.add(o.Customer_Account__c);
+                tasks.add(new Task(
+                    WhatId = o.Id,
+                    Subject = 'Follow up on order ' + o.Name,
+                    OwnerId = o.Sales_Rep__c,
+                    ActivityDate = Date.today().addDays(3)
+                ));
+            }
+        }
+
+        if (!accountIds.isEmpty()) {
+            List<Account> accs = [SELECT Id, Is_Active_Buyer__c FROM Account WHERE Id IN :accountIds];
+            for (Account a : accs) a.Is_Active_Buyer__c = true;
+            update accs;
+        }
+        if (!tasks.isEmpty()) insert tasks;
+    }
+}`,
+  },
+  {
+    id: 'future',
+    name: '@future / Queueable Callout',
+    icon: 'send',
+    usecase: 'Callout to external Warehouse API for packaging',
+    type: 'async',
+    benefit: 'Runs in separate thread — zero user-facing latency',
+    code: `public class WarehouseService {
+
+    @future(callout=true)
+    public static void sendOrderToWarehouse(Id orderId) {
+        Order__c o = [
+            SELECT Id, Name, Total_Amount__c, Customer_Account__r.Name,
+                   Shipping_Address__c
+            FROM Order__c WHERE Id = :orderId
+        ];
+
+        Http http = new Http();
+        HttpRequest req = new HttpRequest();
+        req.setEndpoint('callout:Warehouse_API/orders');
+        req.setMethod('POST');
+        req.setHeader('Content-Type', 'application/json');
+        req.setBody(JSON.serialize(new Map<String, Object>{
+            'orderId'  => o.Name,
+            'customer' => o.Customer_Account__r.Name,
+            'amount'   => o.Total_Amount__c,
+            'address'  => o.Shipping_Address__c
+        }));
+
+        HttpResponse res = http.send(req);
+        System.debug('Warehouse response: ' + res.getStatusCode());
+    }
+}`,
+  },
+  {
+    id: 'batch',
+    name: 'Batch Apex',
+    icon: 'database',
+    usecase: 'Scan 2.4M customers, mark inactive if no purchase in 1 year',
+    type: 'async',
+    benefit: 'Processes in chunks of 200 — fresh governor limits per chunk',
+    code: `public class InactiveCustomerBatch implements Database.Batchable<SObject>, Database.Stateful {
+
+    public Integer totalInactive = 0;
+
+    public Database.QueryLocator start(Database.BatchableContext bc) {
+        Date cutoff = Date.today().addMonths(-12);
+        return Database.getQueryLocator(
+            'SELECT Id, Last_Order_Date__c, Is_Active_Buyer__c ' +
+            'FROM Customer__c ' +
+            'WHERE Is_Active_Buyer__c = true AND Last_Order_Date__c < :cutoff'
+        );
+    }
+
+    public void execute(Database.BatchableContext bc, List<Customer__c> scope) {
+        for (Customer__c c : scope) {
+            c.Is_Active_Buyer__c = false;
+            c.Inactive_Flagged_On__c = Date.today();
+        }
+        update scope;
+        totalInactive += scope.size();
+    }
+
+    public void finish(Database.BatchableContext bc) {
+        System.debug('Flagged ' + totalInactive + ' customers as inactive.');
+        // Optionally chain another job or send an admin email
+    }
+}
+// Execute:  Database.executeBatch(new InactiveCustomerBatch(), 200);`,
+  },
+  {
+    id: 'schedule',
+    name: 'Schedulable Apex',
+    icon: 'clock',
+    usecase: 'Nightly cleanup of Cart &amp; Wishlist records older than 6 months',
+    type: 'async',
+    benefit: 'Runs on cron — no trigger needed, no manual invocation',
+    code: `public class NightlyCartCleanup implements Schedulable {
+
+    public void execute(SchedulableContext sc) {
+        Date cutoff = Date.today().addMonths(-6);
+
+        List<Cart_Item__c> oldCarts = [
+            SELECT Id FROM Cart_Item__c
+            WHERE LastModifiedDate < :cutoff AND Status__c != 'Purchased'
+        ];
+        List<Wishlist_Item__c> oldWishes = [
+            SELECT Id FROM Wishlist_Item__c WHERE LastModifiedDate < :cutoff
+        ];
+
+        if (!oldCarts.isEmpty())  delete oldCarts;
+        if (!oldWishes.isEmpty()) delete oldWishes;
+
+        System.debug('Deleted ' + oldCarts.size() + ' carts, ' + oldWishes.size() + ' wishes.');
+    }
+}
+
+/* Schedule from anonymous Apex:
+   String cron = '0 0 2 * * ?';     // every day at 2:00 AM
+   System.schedule('NightlyCartCleanup', cron, new NightlyCartCleanup());
+*/`,
+  },
+  {
+    id: 'queueable',
+    name: 'Queueable Chaining',
+    icon: 'link',
+    usecase: 'Sequential post-order ops: Inventory → Notify → Log',
+    type: 'async',
+    benefit: 'Ordered dependency, accepts Apex objects, up to 50 chained jobs',
+    code: `// -------- JOB 1 --------
+public class InventoryUpdateJob implements Queueable {
+    private Id orderId;
+    public InventoryUpdateJob(Id orderId) { this.orderId = orderId; }
+
+    public void execute(QueueableContext ctx) {
+        // ... decrement stock ...
+        if (!Test.isRunningTest()) {
+            System.enqueueJob(new ExternalNotifyJob(orderId));
+        }
+    }
+}
+
+// -------- JOB 2 --------
+public class ExternalNotifyJob implements Queueable, Database.AllowsCallouts {
+    private Id orderId;
+    public ExternalNotifyJob(Id orderId) { this.orderId = orderId; }
+
+    public void execute(QueueableContext ctx) {
+        // ... send webhook ...
+        if (!Test.isRunningTest()) {
+            System.enqueueJob(new ConfirmationLogJob(orderId));
+        }
+    }
+}
+
+// -------- JOB 3 --------
+public class ConfirmationLogJob implements Queueable {
+    private Id orderId;
+    public ConfirmationLogJob(Id orderId) { this.orderId = orderId; }
+
+    public void execute(QueueableContext ctx) {
+        insert new Audit_Log__c(Order__c = orderId, Event__c = 'Confirmed');
+    }
+}
+
+// Kick off from OrderTriggerHandler:
+// System.enqueueJob(new InventoryUpdateJob(order.Id));`,
+  },
+];
+
+const quizQuestions = [
+  {
+    q: 'Myntra needs to call the external Warehouse REST API right after an order is confirmed — without making the user wait. Which async tool fits best?',
+    options: [
+      '@future(callout=true) method',
+      'Batch Apex',
+      'Synchronous trigger logic',
+      'Schedulable Apex',
+    ],
+    correct: 0,
+    explain: '@future(callout=true) runs in a separate thread and is designed specifically for non-blocking callouts from triggers.',
+  },
+  {
+    q: 'You need to process 2.4 million Customer records nightly and mark those inactive for 1+ year. Which tool?',
+    options: [
+      'A single @future call',
+      'Batch Apex (chunks of 200)',
+      'Queueable Apex',
+      'Multiple triggers',
+    ],
+    correct: 1,
+    explain: 'Batch Apex processes records in chunks of 200 with fresh governor limits per chunk — perfect for millions of records.',
+  },
+  {
+    q: 'After an order, you must run three dependent operations in order: Inventory → Notify → Log. Best choice?',
+    options: [
+      '@future chain',
+      'Three separate batch jobs',
+      'Queueable chaining via System.enqueueJob',
+      'Platform Events only',
+    ],
+    correct: 2,
+    explain: 'Queueables support chaining, accept Apex objects as parameters, and preserve ordered dependency between jobs.',
+  },
+  {
+    q: 'Every night at 2:00 AM you want to clean old cart/wishlist records. Which technique?',
+    options: [
+      'Schedulable Apex with cron "0 0 2 * * ?"',
+      'A trigger on Cart_Item__c',
+      '@future method',
+      'Platform cache',
+    ],
+    correct: 0,
+    explain: 'Schedulable Apex runs on a cron expression — ideal for recurring, time-based cleanup jobs.',
+  },
+  {
+    q: 'When Order status flips to Confirmed, you must update the related Account and create a Task synchronously. What runs this?',
+    options: [
+      'Queueable Apex',
+      'Batch Apex',
+      'Trigger with synchronous DML (after update)',
+      'Scheduled Apex',
+    ],
+    correct: 2,
+    explain: 'Sync DML inside an after-update trigger guarantees the Account + Task are updated in the same transaction as the Order.',
+  },
+  {
+    q: 'Which limitation is unique to @future methods (vs Queueable)?',
+    options: [
+      'Cannot run callouts',
+      'Cannot accept sObject or Apex object parameters',
+      'Cannot be called from a trigger',
+      'Cannot perform DML',
+    ],
+    correct: 1,
+    explain: '@future only accepts primitive types or collections of primitives. Queueable accepts any Apex object — a key reason to prefer it.',
+  },
+  {
+    q: 'What is the default batch size for Database.executeBatch() and what\'s the maximum?',
+    options: [
+      'Default 100, max 1000',
+      'Default 200, max 2000',
+      'Default 50, max 500',
+      'Default 500, max 5000',
+    ],
+    correct: 1,
+    explain: 'Batch Apex defaults to 200 records per chunk and can be set up to 2,000 — tune based on your execute() complexity.',
+  },
+  {
+    q: 'Inside a Queueable, how many jobs can you chain before Salesforce stops accepting enqueueJob calls?',
+    options: [
+      '1 (no chaining allowed)',
+      '5 in production, 2 in test',
+      '50 chained jobs per transaction chain',
+      'Unlimited',
+    ],
+    correct: 2,
+    explain: 'Salesforce limits chained Queueable depth to 50 in a single chain; always guard with !Test.isRunningTest() in test contexts.',
+  },
+];
+
+/* ============================================================
+   THEME + MOBILE NAV
+============================================================ */
+function initTheme() {
+  const saved = 'dark';
+  document.documentElement.setAttribute('data-theme', saved);
+}
+function toggleTheme() {
+  const cur = document.documentElement.getAttribute('data-theme');
+  document.documentElement.setAttribute('data-theme', cur === 'dark' ? 'light' : 'dark');
+  // re-render prism
+  Prism.highlightAll();
+}
+function toggleMobileNav() {
+  const nav = document.getElementById('mobile-nav');
+  nav.classList.toggle('hidden');
+}
+
+/* ============================================================
+   PARTICLES
+============================================================ */
+function initParticles() {
+  const container = document.getElementById('particles');
+  for (let i = 0; i < 22; i++) {
+    const p = document.createElement('div');
+    p.className = 'particle';
+    p.style.left = Math.random() * 100 + '%';
+    p.style.bottom = '-10px';
+    p.style.animationDuration = (8 + Math.random() * 10) + 's';
+    p.style.animationDelay = Math.random() * 8 + 's';
+    p.style.background = i % 2 === 0 ? 'var(--myntra-pink)' : 'var(--sf-sky)';
+    p.style.width = p.style.height = (2 + Math.random() * 3) + 'px';
+    container.appendChild(p);
+  }
+}
+
+/* ============================================================
+   REVEAL ON SCROLL
+============================================================ */
+function initReveal() {
+  const io = new IntersectionObserver((entries) => {
+    entries.forEach(e => {
+      if (e.isIntersecting) {
+        e.target.classList.add('in');
+        io.unobserve(e.target);
+      }
+    });
+  }, { threshold: 0.1 });
+  document.querySelectorAll('.reveal').forEach(el => io.observe(el));
+}
+
+/* ============================================================
+   ACTIVE SIDE NAV LINK
+============================================================ */
+function initActiveNav() {
+  const sections = ['simulation','matrix','architecture','batch','scheduler','chain','playground','quiz'];
+  const links = document.querySelectorAll('[data-navlink]');
+  const io = new IntersectionObserver((entries) => {
+    entries.forEach(e => {
+      if (e.isIntersecting) {
+        links.forEach(a => a.classList.toggle('active', a.getAttribute('href') === '#' + e.target.id));
+      }
+    });
+  }, { rootMargin: '-40% 0px -50% 0px' });
+  sections.forEach(id => {
+    const s = document.getElementById(id);
+    if (s) io.observe(s);
+  });
+}
+
+/* ============================================================
+   SIMULATOR
+============================================================ */
+async function runSimulation() {
+  if (state.simRunning) return;
+  state.simRunning = true;
+
+  // reset
+  document.querySelectorAll('#pipeline .pipe-step').forEach(el => {
+    el.classList.remove('active', 'done');
+  });
+  document.getElementById('sim-result').classList.add('hidden');
+
+  // user-facing counter (only counts SYNC steps)
+  let userMs = 0;
+  const timerEl = document.getElementById('sim-timer');
+  timerEl.textContent = '0ms';
+
+  const steps = document.querySelectorAll('#pipeline .pipe-step');
+  const timings = [80, 60, 50, 40, 200, 150]; // ms per step
+
+  for (let i = 0; i < steps.length; i++) {
+    const step = steps[i];
+    step.classList.add('active');
+
+    const type = step.querySelector('.badge').classList.contains('badge-sync') ? 'sync' : 'async';
+    await sleep(500 + timings[i]);
+
+    // sync time counts toward user-facing latency; async does NOT
+    if (type === 'sync') {
+      userMs += timings[i];
+      timerEl.textContent = userMs + 'ms';
+    }
+
+    step.classList.remove('active');
+    step.classList.add('done');
+  }
+
+  // show result
+  document.getElementById('sim-user-ms').textContent = userMs + 'ms';
+  document.getElementById('sim-result').classList.remove('hidden');
+  state.simRunning = false;
+}
+function sleep(ms) { return new Promise(r => setTimeout(r, ms)); }
+
+/* ============================================================
+   DECISION MATRIX
+============================================================ */
+function renderMatrix() {
+  const body = document.getElementById('matrix-body');
+  body.innerHTML = matrixData.map((row, idx) => `
+    <tr class="matrix-row" data-matrix-row="${row.id}" style="border-top: 1px solid var(--card-border);">
+      <td class="px-5 py-4">
+        <div class="flex items-center gap-3">
+          <div class="w-9 h-9 rounded-lg flex items-center justify-center" style="background: color-mix(in srgb, var(--${row.type === 'sync' ? 'sf-blue' : 'myntra-pink'}) 15%, transparent); color: var(--${row.type === 'sync' ? 'sf-sky' : 'myntra-pink'});">
+            <i data-lucide="${row.icon}" class="w-4 h-4"></i>
+          </div>
+          <span class="font-semibold">${row.name}</span>
+        </div>
+      </td>
+      <td class="px-5 py-4" style="color: var(--text-dim);">${row.usecase}</td>
+      <td class="px-5 py-4"><span class="badge badge-${row.type}">${row.type === 'sync' ? 'Sync' : 'Async'}</span></td>
+      <td class="px-5 py-4 hidden md:table-cell" style="color: var(--text-dim);">${row.benefit}</td>
+      <td class="px-5 py-4 text-right">
+        <i data-lucide="chevron-down" class="w-4 h-4 inline transition-transform" id="chev-${row.id}" style="color: var(--text-mute);"></i>
+      </td>
+    </tr>
+    <tr>
+      <td colspan="5" class="p-0">
+        <div class="matrix-panel" id="panel-${row.id}">
+          <div class="p-5" style="background: var(--bg-1); border-top: 1px solid var(--card-border);">
+            <div class="code-wrap">
+              <button class="copy-btn" data-copy-target="mcode-${row.id}"><i data-lucide="copy" class="w-3 h-3"></i> Copy</button>
+              <pre><code id="mcode-${row.id}" class="language-apex">${escapeHtml(row.code)}</code></pre>
+            </div>
+          </div>
+        </div>
+      </td>
+    </tr>
+  `).join('');
+}
+function toggleMatrix(id) {
+  const panel = document.getElementById('panel-' + id);
+  const chev = document.getElementById('chev-' + id);
+  const row = document.querySelector(`[data-matrix-row="${id}"]`);
+  const isOpen = panel.classList.contains('open');
+
+  // close all
+  document.querySelectorAll('.matrix-panel').forEach(p => p.classList.remove('open'));
+  document.querySelectorAll('[data-matrix-row]').forEach(r => r.classList.remove('open'));
+  document.querySelectorAll('[id^="chev-"]').forEach(c => c.style.transform = '');
+
+  if (!isOpen) {
+    panel.classList.add('open');
+    row.classList.add('open');
+    chev.style.transform = 'rotate(180deg)';
+    Prism.highlightAllUnder(panel);
+  }
+}
+
+/* ============================================================
+   ARCHITECTURE TOOLTIP
+============================================================ */
+function initArchTooltip() {
+  const svg = document.getElementById('arch-svg');
+  const tip = document.getElementById('arch-tooltip');
+  const container = svg.parentElement;
+
+  svg.querySelectorAll('.arch-node-group').forEach(g => {
+    g.addEventListener('mouseenter', (e) => {
+      const txt = g.getAttribute('data-tip');
+      if (!txt) return;
+      tip.textContent = txt;
+      tip.classList.add('show');
+    });
+    g.addEventListener('mousemove', (e) => {
+      const rect = container.getBoundingClientRect();
+      tip.style.left = (e.clientX - rect.left + 12) + 'px';
+      tip.style.top  = (e.clientY - rect.top + 12) + 'px';
+    });
+    g.addEventListener('mouseleave', () => {
+      tip.classList.remove('show');
+    });
+  });
+}
+
+/* ============================================================
+   BATCH SIMULATOR
+============================================================ */
+async function runBatch() {
+  if (state.batchRunning) return;
+  state.batchRunning = true;
+
+  const total = 2450000;
+  const chunkSize = 200;
+  const totalChunks = Math.ceil(total / chunkSize);
+  let processed = 0;
+  let chunksDone = 0;
+  let inactive = 0;
+
+  const progressEl = document.getElementById('batch-progress');
+  const processedEl = document.getElementById('batch-processed');
+  const inactiveEl = document.getElementById('batch-inactive');
+  const chunksEl = document.getElementById('batch-chunks');
+  const btn = document.getElementById('batch-btn');
+
+  btn.disabled = true;
+  btn.innerHTML = '<i data-lucide="loader-2" class="w-4 h-4 animate-spin"></i> Running Batch Job...';
+  lucide.createIcons();
+
+  // Animate in ~3s. Steps of 50 chunks per frame.
+  const stepsPerFrame = Math.ceil(totalChunks / 60);
+  await new Promise(resolve => {
+    const iv = setInterval(() => {
+      for (let i = 0; i < stepsPerFrame && chunksDone < totalChunks; i++) {
+        chunksDone++;
+        const chunkProcessed = Math.min(chunkSize, total - processed);
+        processed += chunkProcessed;
+        // ~18% flagged inactive
+        inactive += Math.round(chunkProcessed * 0.18 * (0.9 + Math.random() * 0.2));
+      }
+      const pct = (processed / total) * 100;
+      progressEl.style.width = pct + '%';
+      processedEl.textContent = processed.toLocaleString();
+      inactiveEl.textContent = inactive.toLocaleString();
+      chunksEl.textContent = chunksDone.toLocaleString() + ' / ' + totalChunks.toLocaleString();
+
+      if (chunksDone >= totalChunks) {
+        clearInterval(iv);
+        resolve();
+      }
+    }, 50);
+  });
+
+  btn.disabled = false;
+  btn.innerHTML = '<i data-lucide="check-circle-2" class="w-4 h-4"></i> Job Complete — Run Again';
+  lucide.createIcons();
+  state.batchRunning = false;
+}
+
+/* ============================================================
+   SCHEDULER (CLOCK + CART)
+============================================================ */
+function initClock() {
+  // clock face marks
+  const face = document.getElementById('clock-face');
+  for (let i = 0; i < 12; i++) {
+    const m = document.createElement('div');
+    m.className = 'clock-mark';
+    m.style.transform = `rotate(${i * 30}deg)`;
+    face.appendChild(m);
+  }
+  updateClock();
+  state.clockInterval = setInterval(updateClock, 1000);
+}
+function updateClock() {
+  if (state.clockFrozen) return;
+  const now = new Date();
+  setClockHands(now.getHours(), now.getMinutes(), now.getSeconds(), false);
+}
+function setClockHands(hours, minutes, seconds, animate) {
+  const hourEl = document.getElementById('hand-hour');
+  const minEl  = document.getElementById('hand-min');
+  const secEl  = document.getElementById('hand-sec');
+  const digital = document.getElementById('clock-digital');
+
+  const sec = seconds;
+  const min = minutes + sec / 60;
+  const hr = (hours % 12) + min / 60;
+
+  [hourEl, minEl, secEl].forEach(el => {
+    if (animate) el.classList.add('animating');
+    else el.classList.remove('animating');
+  });
+
+  hourEl.style.transform = `rotate(${hr * 30}deg)`;
+  minEl.style.transform  = `rotate(${min * 6}deg)`;
+  secEl.style.transform  = `rotate(${sec * 6}deg)`;
+
+  if (digital) {
+    const h12 = ((hours % 12) || 12).toString().padStart(2, '0');
+    const mm  = Math.floor(minutes).toString().padStart(2, '0');
+    const ss  = Math.floor(seconds).toString().padStart(2, '0');
+    const period = hours < 12 ? 'AM' : 'PM';
+    digital.textContent = `${h12}:${mm}:${ss} ${period}`;
+  }
+}
+
+const cartItems = [
+  { name: 'Nike Air Max 270', age: '8 months ago', old: true },
+  { name: 'H&M Hoodie',       age: '3 days ago',   old: false },
+  { name: 'Levi\'s 511 Jeans', age: '7 months ago', old: true },
+  { name: 'Roadster T-shirt', age: '2 weeks ago',  old: false },
+  { name: 'Puma Running Shoes', age: '9 months ago', old: true },
+  { name: 'UCB Sweater',      age: '1 month ago',  old: false },
+  { name: 'Tommy Hilfiger Polo', age: '11 months ago', old: true },
+  { name: 'Forever 21 Dress', age: '5 days ago',   old: false },
+];
+function renderCart() {
+  const list = document.getElementById('cart-list');
+  list.innerHTML = cartItems.map((it, i) => `
+    <div class="cart-item" data-cart-item="${i}">
+      <div class="flex items-center gap-3">
+        <i data-lucide="shopping-bag" class="w-4 h-4" style="color: ${it.old ? 'var(--myntra-pink)' : 'var(--sf-sky)'};"></i>
+        <div>
+          <div class="font-semibold text-sm">${it.name}</div>
+          <div class="text-xs" style="color: var(--text-dim);">Last modified: ${it.age}</div>
+        </div>
+      </div>
+      ${it.old
+        ? '<span class="badge" style="background: rgba(239,68,68,0.15); color: #ef4444;">&gt; 6 months</span>'
+        : '<span class="badge badge-sync">Fresh</span>'}
+    </div>
+  `).join('');
+}
+async function runSchedule() {
+  if (state.schedRunning) return;
+  state.schedRunning = true;
+  const btn = document.getElementById('sched-btn');
+  const face = document.getElementById('clock-face');
+  btn.disabled = true;
+  btn.innerHTML = '<i data-lucide="loader-2" class="w-3 h-3 inline mr-1 animate-spin"></i> Spinning to 2 AM...';
+  lucide.createIcons();
+
+  // 1. Freeze live time updates and smoothly rotate hands to 2:00:00 AM
+  state.clockFrozen = true;
+  face.classList.add('night');
+  setClockHands(2, 0, 0, true);     // animate to 2 AM
+  await sleep(1700);                // wait for the ease to land
+
+  // 2. Now that we're "at 2 AM", begin pruning — and tick the seconds forward for realism
+  btn.innerHTML = '<i data-lucide="loader-2" class="w-3 h-3 inline mr-1 animate-spin"></i> Running 2 AM Job...';
+  lucide.createIcons();
+
+  const items = document.querySelectorAll('[data-cart-item]');
+  let tickSec = 0;
+  for (let i = 0; i < cartItems.length; i++) {
+    if (cartItems[i].old) {
+      items[i].classList.add('deleted');
+      // advance the clock a few seconds for each prune
+      tickSec += 2;
+      setClockHands(2, Math.floor(tickSec / 60), tickSec % 60, false);
+      await sleep(300);
+    }
+  }
+
+  await sleep(500);
+  btn.innerHTML = '<i data-lucide="check" class="w-3 h-3 inline mr-1"></i> Job Complete';
+  lucide.createIcons();
+  await sleep(900);
+
+  // 3. Animate hands back to live time
+  const now = new Date();
+  setClockHands(now.getHours(), now.getMinutes(), now.getSeconds(), true);
+  face.classList.remove('night');
+  await sleep(1700);
+  state.clockFrozen = false;
+
+  btn.disabled = false;
+  btn.innerHTML = '<i data-lucide="rotate-cw" class="w-3 h-3 inline mr-1"></i> Reset &amp; Run Again';
+  lucide.createIcons();
+  state.schedRunning = false;
+
+  // Re-add a one-shot reset behavior
+  setTimeout(() => {
+    if (!state.schedRunning) {
+      renderCart();
+      lucide.createIcons();
+      btn.innerHTML = '<i data-lucide="play" class="w-3 h-3 inline mr-1"></i> Simulate Nightly Run';
+      lucide.createIcons();
+    }
+  }, 5000);
+}
+
+/* ============================================================
+   QUEUEABLE CHAIN — runs as an infinite loop until stopped
+============================================================ */
+async function runChain() {
+  // Toggle stop if already running
+  if (state.chainRunning) {
+    state.chainStopRequested = true;
+    return;
+  }
+
+  state.chainRunning = true;
+  state.chainStopRequested = false;
+  state.chainCycle = 0;
+
+  const btn = document.getElementById('chain-btn');
+  btn.innerHTML = '<i data-lucide="square" class="w-4 h-4"></i> Stop Chain';
+  lucide.createIcons();
+
+  const steps = [
+    { id: 1, label: 'running — updating stock levels...', duration: 1100, done: 'enqueued next ↓' },
+    { id: 2, label: 'running — POST /webhooks/order...',  duration: 1200, done: 'enqueued next ↓' },
+    { id: 3, label: 'running — insert Audit_Log__c...',   duration: 900,  done: 'enqueued next ↓' },
+  ];
+
+  // Keep cycling through the chain forever until stop is requested
+  while (!state.chainStopRequested) {
+    state.chainCycle++;
+    updateChainCycleBadge();
+
+    // Reset nodes at the start of every cycle
+    [1,2,3].forEach(n => {
+      const node = document.getElementById('chain-' + n);
+      const status = document.getElementById('chain-' + n + '-status');
+      node.classList.remove('running','done');
+      status.textContent = 'idle';
+      status.style.color = 'var(--text-mute)';
+    });
+    ['arrow-1','arrow-2'].forEach(a => document.getElementById(a).classList.remove('active'));
+
+    // Let the reset visibly settle
+    await sleep(350);
+    if (state.chainStopRequested) break;
+
+    // Step through each job in the chain
+    for (let i = 0; i < steps.length; i++) {
+      if (state.chainStopRequested) break;
+
+      const s = steps[i];
+      const node = document.getElementById('chain-' + s.id);
+      const status = document.getElementById('chain-' + s.id + '-status');
+
+      node.classList.add('running');
+      status.textContent = s.label;
+      status.style.color = 'var(--sf-sky)';
+      if (i > 0) document.getElementById('arrow-' + i).classList.add('active');
+
+      await sleep(s.duration);
+      if (state.chainStopRequested) break;
+
+      node.classList.remove('running');
+      node.classList.add('done');
+      // On the final step, the "enqueued next" message points back to step 1 (visualizing the re-chain)
+      status.textContent = (i === steps.length - 1) ? 'enqueued next → loop' : s.done;
+      status.style.color = '#22c55e';
+      if (i > 0) document.getElementById('arrow-' + i).classList.remove('active');
+    }
+
+    if (state.chainStopRequested) break;
+
+    // Visual "hand-off to next cycle" pause
+    await sleep(700);
+  }
+
+  // On stop: freeze final state briefly, then restore idle button
+  btn.innerHTML = '<i data-lucide="play" class="w-4 h-4"></i> Start Chain';
+  lucide.createIcons();
+  state.chainRunning = false;
+  state.chainStopRequested = false;
+}
+
+function updateChainCycleBadge() {
+  const badge = document.getElementById('chain-cycle');
+  if (badge) {
+    badge.textContent = `Cycle #${state.chainCycle}`;
+    badge.classList.remove('hidden');
+  }
+}
+
+/* ============================================================
+   PLAYGROUND
+============================================================ */
+function renderPlaygroundTabs() {
+  const tabs = document.getElementById('code-tabs');
+  tabs.innerHTML = matrixData.map(t => `
+    <button class="code-tab ${t.id === state.activeCodeTab ? 'active' : ''}" data-code-tab="${t.id}">
+      <i data-lucide="${t.icon}" class="w-3 h-3 inline mr-1"></i> ${t.name}
+    </button>
+  `).join('');
+  renderPlaygroundCode();
+}
+function renderPlaygroundCode() {
+  const t = matrixData.find(m => m.id === state.activeCodeTab);
+  if (!t) return;
+  const codeEl = document.getElementById('playground-code');
+  codeEl.textContent = t.code;
+  Prism.highlightElement(codeEl);
+
+  const meta = document.getElementById('code-meta');
+  meta.innerHTML = `
+    <div class="grid md:grid-cols-2 gap-4">
+      <div class="callout">
+        <div class="text-xs font-bold uppercase tracking-wide mb-1" style="color: var(--sf-sky);">When to use</div>
+        <div class="text-sm">${t.usecase}</div>
+      </div>
+      <div class="callout-warn">
+        <div class="text-xs font-bold uppercase tracking-wide mb-1" style="color: #facc15;">Governor limit benefit</div>
+        <div class="text-sm">${t.benefit}</div>
+      </div>
+    </div>
+  `;
+}
+
+/* ============================================================
+   QUIZ
+============================================================ */
+function renderQuiz() {
+  const q = quizQuestions[state.quiz.idx];
+  const body = document.getElementById('quiz-body');
+  document.getElementById('q-current').textContent = state.quiz.idx + 1;
+  document.getElementById('q-total').textContent = quizQuestions.length;
+  document.getElementById('q-score').textContent = state.quiz.score;
+  document.getElementById('q-best').textContent = state.quiz.best;
+
+  if (state.quiz.done) {
+    body.innerHTML = `
+      <div class="text-center py-8">
+        <div class="inline-flex items-center justify-center w-20 h-20 rounded-full mb-4"
+             style="background: linear-gradient(135deg, var(--myntra-pink), var(--sf-sky));">
+          <i data-lucide="trophy" class="w-10 h-10 text-white"></i>
+        </div>
+        <h3 class="text-3xl font-bold mb-2 grad-text">${state.quiz.score} / ${quizQuestions.length}</h3>
+        <p class="mb-6" style="color: var(--text-dim);">
+          ${state.quiz.score === quizQuestions.length
+            ? 'Perfect score! You\'re a Salesforce async pro.'
+            : state.quiz.score >= quizQuestions.length * 0.6
+              ? 'Solid performance. Review the Decision Matrix to lock in the edge cases.'
+              : 'Keep going — scroll back up and tour the simulators, then retry.'}
+        </p>
+        <button data-action="restart-quiz" class="btn-primary inline-flex items-center gap-2">
+          <i data-lucide="rotate-cw" class="w-4 h-4"></i> Retry Quiz
+        </button>
+      </div>
+    `;
+    lucide.createIcons();
+    return;
+  }
+
+  body.innerHTML = `
+    <div class="mb-6">
+      <h3 class="text-xl font-bold mb-1">${q.q}</h3>
+    </div>
+    <div class="space-y-3" id="quiz-opts">
+      ${q.options.map((opt, i) => `
+        <button class="quiz-opt" data-quiz-opt="${i}">
+          <div class="flex items-center gap-3">
+            <div class="w-8 h-8 rounded-lg flex items-center justify-center text-xs font-bold flex-shrink-0"
+                 style="background: var(--bg-3); color: var(--text-dim);">${String.fromCharCode(65 + i)}</div>
+            <span class="text-sm">${opt}</span>
+          </div>
+        </button>
+      `).join('')}
+    </div>
+    <div id="quiz-feedback" class="mt-5 hidden"></div>
+  `;
+  lucide.createIcons();
+}
+function answerQuiz(idx) {
+  if (state.quiz.locked) return;
+  state.quiz.locked = true;
+
+  const q = quizQuestions[state.quiz.idx];
+  const opts = document.querySelectorAll('[data-quiz-opt]');
+  const selected = idx;
+  const isCorrect = selected === q.correct;
+
+  opts.forEach((btn, i) => {
+    btn.disabled = true;
+    if (i === q.correct) btn.classList.add('correct');
+    else if (i === selected) btn.classList.add('wrong');
+  });
+
+  if (isCorrect) state.quiz.score++;
+
+  const fb = document.getElementById('quiz-feedback');
+  fb.classList.remove('hidden');
+  fb.innerHTML = `
+    <div class="${isCorrect ? 'callout' : 'callout-warn'}">
+      <div class="flex items-start gap-3">
+        <i data-lucide="${isCorrect ? 'check-circle-2' : 'x-circle'}" class="w-5 h-5 flex-shrink-0 mt-0.5"
+           style="color: ${isCorrect ? '#22c55e' : '#ef4444'};"></i>
+        <div class="flex-1">
+          <div class="font-semibold text-sm">${isCorrect ? 'Correct!' : 'Not quite.'}</div>
+          <div class="text-sm mt-1" style="color: var(--text-dim);">${q.explain}</div>
+          <button data-action="next-question" class="btn-primary mt-3 text-sm inline-flex items-center gap-2">
+            ${state.quiz.idx + 1 >= quizQuestions.length ? 'See Results' : 'Next Question'}
+            <i data-lucide="arrow-right" class="w-3 h-3"></i>
+          </button>
+        </div>
+      </div>
+    </div>
+  `;
+  lucide.createIcons();
+
+  document.getElementById('q-score').textContent = state.quiz.score;
+}
+function nextQuestion() {
+  state.quiz.locked = false;
+  state.quiz.idx++;
+  if (state.quiz.idx >= quizQuestions.length) {
+    state.quiz.done = true;
+    if (state.quiz.score > state.quiz.best) state.quiz.best = state.quiz.score;
+  }
+  renderQuiz();
+}
+function restartQuiz() {
+  state.quiz = { idx: 0, score: 0, best: state.quiz.best, done: false, locked: false };
+  renderQuiz();
+}
+
+/* ============================================================
+   COPY-TO-CLIPBOARD
+============================================================ */
+function copyCode(btn) {
+  const targetId = btn.getAttribute('data-copy-target');
+  const el = document.getElementById(targetId);
+  if (!el) return;
+  const text = el.textContent;
+
+  try {
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+      navigator.clipboard.writeText(text);
+    } else {
+      const ta = document.createElement('textarea');
+      ta.value = text;
+      ta.style.position = 'fixed'; ta.style.opacity = '0';
+      document.body.appendChild(ta); ta.select(); document.execCommand('copy');
+      document.body.removeChild(ta);
+    }
+    btn.classList.add('copied');
+    btn.innerHTML = '<i data-lucide="check" class="w-3 h-3"></i> Copied';
+    lucide.createIcons();
+    setTimeout(() => {
+      btn.classList.remove('copied');
+      btn.innerHTML = '<i data-lucide="copy" class="w-3 h-3"></i> Copy';
+      lucide.createIcons();
+    }, 1600);
+  } catch (e) {
+    console.error('copy failed', e);
+  }
+}
+
+/* ============================================================
+   CURSOR-REACTIVE SPOTLIGHT + STAT CARD GLOW
+============================================================ */
+function initSpotlight() {
+  const spotlight = document.getElementById('spotlight');
+  if (!spotlight) return;
+
+  let rafId = null;
+  let targetX = window.innerWidth / 2;
+  let targetY = window.innerHeight / 2;
+  let currentX = targetX;
+  let currentY = targetY;
+
+  function animate() {
+    // Smooth ease toward target for a fluid trailing effect
+    currentX += (targetX - currentX) * 0.12;
+    currentY += (targetY - currentY) * 0.12;
+    spotlight.style.setProperty('--mx', currentX + 'px');
+    spotlight.style.setProperty('--my', currentY + 'px');
+    rafId = requestAnimationFrame(animate);
+  }
+  animate();
+
+  window.addEventListener('mousemove', (e) => {
+    targetX = e.clientX;
+    targetY = e.clientY;
+  }, { passive: true });
+
+  // Stat card individual glow that follows the cursor within each card
+  document.querySelectorAll('.stat-card').forEach(card => {
+    card.addEventListener('mousemove', (e) => {
+      const rect = card.getBoundingClientRect();
+      const x = ((e.clientX - rect.left) / rect.width) * 100;
+      const y = ((e.clientY - rect.top) / rect.height) * 100;
+      card.style.setProperty('--sx', x + '%');
+      card.style.setProperty('--sy', y + '%');
+    });
+  });
+}
+
+/* ============================================================
+   HTML ESCAPE
+============================================================ */
+function escapeHtml(s) {
+  return s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+}
+
+/* ============================================================
+   EVENT DELEGATION
+============================================================ */
+document.addEventListener('click', (e) => {
+  const actionEl = e.target.closest('[data-action]');
+  if (actionEl) {
+    const action = actionEl.getAttribute('data-action');
+    switch (action) {
+      case 'toggle-theme': toggleTheme(); return;
+      case 'toggle-mobile-nav': toggleMobileNav(); return;
+      case 'place-order': runSimulation(); return;
+      case 'run-batch': runBatch(); return;
+      case 'run-schedule': runSchedule(); return;
+      case 'start-chain': runChain(); return;
+      case 'restart-quiz': restartQuiz(); return;
+      case 'next-question': nextQuestion(); return;
+    }
+  }
+
+  const matrixRow = e.target.closest('[data-matrix-row]');
+  if (matrixRow) {
+    toggleMatrix(matrixRow.getAttribute('data-matrix-row'));
+    return;
+  }
+
+  const codeTab = e.target.closest('[data-code-tab]');
+  if (codeTab) {
+    state.activeCodeTab = codeTab.getAttribute('data-code-tab');
+    document.querySelectorAll('[data-code-tab]').forEach(t => t.classList.remove('active'));
+    codeTab.classList.add('active');
+    renderPlaygroundCode();
+    return;
+  }
+
+  const quizOpt = e.target.closest('[data-quiz-opt]');
+  if (quizOpt) {
+    answerQuiz(parseInt(quizOpt.getAttribute('data-quiz-opt')));
+    return;
+  }
+
+  const copyBtn = e.target.closest('.copy-btn');
+  if (copyBtn) {
+    copyCode(copyBtn);
+    return;
+  }
+
+  // close mobile nav when a link is clicked
+  const navLink = e.target.closest('#mobile-nav a');
+  if (navLink) {
+    document.getElementById('mobile-nav').classList.add('hidden');
+  }
+});
+
+/* ============================================================
+   INIT
+============================================================ */
+function init() {
+  initTheme();
+  initParticles();
+  initReveal();
+  initActiveNav();
+  initClock();
+  initSpotlight();
+  renderMatrix();
+  renderCart();
+  renderPlaygroundTabs();
+  renderQuiz();
+  initArchTooltip();
+
+  // render icons
+  lucide.createIcons();
+
+  // run prism once everything is in DOM
+  Prism.highlightAll();
+}
+
+if (document.readyState === 'loading') {
+  document.addEventListener('DOMContentLoaded', init);
+} else {
+  init();
+}
+</script>
 </body>
 </html>
